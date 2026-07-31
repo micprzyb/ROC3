@@ -30,6 +30,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/01_validation.py          # 12 sections of checks
 .venv/bin/python experiments/02_demo.py                # writes figures/
 .venv/bin/python experiments/03_threshold_case_study.py
+.venv/bin/python experiments/04_constrained.py         # the 0<p1<p2<p3<1 propositions
 ```
 
 ## Quick start
@@ -148,6 +149,39 @@ permutation_test_vus(y, proba)                     # H0: VUS = 1/6
 bootstrap_operating_point(y, proba, op.weights)    # CI on (S1, S2, S3) at a fixed rule
 ```
 
+## Logically constrained probabilities
+
+If domain logic forces the class probabilities to be ordered, `0 < p₁ < p₂ < p₃ < 1`,
+the analysis changes — but *which* way depends on what the constraint is about, and the
+two answers are opposite:
+
+```python
+from roc3.constrained import (constrained_report, format_constrained_report,
+                              gauge_normalize, vus_ceiling, to_ordered_gauge)
+
+print(format_constrained_report(constrained_report(y, proba)))
+```
+
+* **Constraint on the model's output** (an ordered softmax, a Semantic Probabilistic
+  Layer): it is a **gauge choice**. Class-wise rescaling `p_k → c_k p_k` is absorbed into
+  the rule's weights, so the surface and both VUS estimators are *bit-for-bit unchanged* —
+  and every model has an ordered twin. What it breaks is `argmax` (which collapses to
+  "always class 3") and the readability of the weight simplex; `gauge_normalize` fixes
+  both, and also changes nothing.
+* **Constraint on the true posterior** (a fact about the world): it cuts ROC space with
+  three planes. The perfect corner becomes **unreachable**, accuracy is capped at `π₃`
+  (so the constant rule is Bayes-optimal and unbeatable), every pairwise AUC is capped at
+  `1 − π_i/(2π_j)`, and the VUS is capped at a computable `VUS_max(π) < 1`. With
+  priors `(0.167, 0.333, 0.5)` the ceiling is **0.444**, not 1 — barely 2.7× chance.
+  So renormalise: `(VUS − 1/6)/(VUS_max − 1/6)`.
+
+The mechanism in one line: *the constraint says you can never be more than 1/3 sure of
+class 1, or more than 1/2 sure of class 2.*
+
+Full derivations, proofs and measurements: [`docs/CONSTRAINED.md`](docs/CONSTRAINED.md).
+
+![ceiling](figures/08_constrained_ceiling.png)
+
 ## More than three classes
 
 The plot stops at three — that is geometry, not a missing feature. The rank statistic
@@ -165,6 +199,7 @@ roc3/
   core.py        rule family, operating points, exact 3-D hypervolume, monotone envelope
   vus.py         3AFC / HUM rank estimators, permutation profile
   ordinal.py     two-cut-point surface for ordered classes
+  constrained.py ROC under the logical constraint 0 < p1 < p2 < p3 < 1
   thresholds.py  operating-point selection (7 criteria + constraints)
   metrics.py     Hand-Till M, one-vs-rest AUC, summary table
   inference.py   closed-form SE, bootstrap, permutation test
@@ -172,6 +207,7 @@ roc3/
   datasets.py    synthetic problems with known ground truth, plus the wine demo
 docs/
   PLAN.md        the design: every approach considered, the maths, the chosen one
+  CONSTRAINED.md the logically-constrained case: gauge invariance vs. the hard ceiling
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study

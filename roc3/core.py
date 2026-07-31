@@ -46,7 +46,14 @@ __all__ = [
 #: Volume under the surface of an uninformative 3-class model:  1/3! .
 CHANCE_VUS = 1.0 / 6.0
 
-_EPS = 1e-12
+#: Floor applied to probabilities before taking logs.  Only differences of log scores
+#: enter any rule in the family, so this floor is what bounds the representable dynamic
+#: range of a score matrix.  It used to be 1e-12, which silently flattened confident
+#: models -- and, worse, destroyed the class-rescaling gauge invariance that
+#: :mod:`roc3.constrained` relies on, because re-gauging pushes one column far down.
+#: 1e-300 keeps every float64-representable probability intact while still giving a
+#: finite log (about -690).
+_EPS = 1e-300
 
 
 # --------------------------------------------------------------------------------------

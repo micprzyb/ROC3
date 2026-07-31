@@ -376,6 +376,16 @@ Documented in `PLAN.md` §7.
 
 **G5 — `np.math.factorial` no longer exists** in NumPy 2.x. Replaced with a local helper.
 
+**G9 — The probability floor was silently destroying dynamic range.**
+`prepare_scores` clipped probabilities at `1e-12` before taking logs. For ordinary models
+that is invisible; it surfaced only when the ordered-gauge work
+([`CONSTRAINED.md`](CONSTRAINED.md)) started pushing one column far down, at which point
+the *provable* class-rescaling invariance failed numerically — VUS moved from 0.9971 to
+0.8637 under a transformation that cannot change it. The floor is now `1e-300`, which
+keeps every float64-representable probability intact. Two lessons: a theorem that must
+hold exactly is the sharpest possible test of the numerics, and a clipping constant
+chosen for "safety" is a silent lossy compression.
+
 **G6 — Wine with all thirteen features is separable.** VUS ≈ 0.99, surface pinned to the
 perfect corner, nothing to look at. Switched the demo to two features (`alcohol`,
 `alcalinity_of_ash`, VUS ≈ 0.81) — still real, honest out-of-fold data, but with a surface
@@ -388,6 +398,95 @@ as a hard error (silently guessing would be worse) and the demos map labels expl
 **G8 — `OrdinalOperatingPoint` lacked `.rates`,** so the shared operating-point card
 crashed on the ordinal path. Added, and the card now branches on whether the rule is a
 weight vector or a pair of cut-points.
+
+---
+
+---
+
+## I. The logical constraint `0 < p₁ < p₂ < p₃ < 1`
+
+Full write-up in [`CONSTRAINED.md`](CONSTRAINED.md); this is the idea-by-idea log.
+
+**I1 — Read the sentence two ways before doing any maths.** **[USED]** "The probabilities
+must satisfy…" can constrain the *model's output* or the *true posterior*. The two give
+opposite answers (nothing changes / everything changes), so the first deliverable was the
+disambiguation, not a formula. A diagnostic distinguishes them empirically: an ordered
+true posterior forces `π₁<π₂<π₃`, so unordered prevalences prove you are in the
+output-only reading.
+
+**I2 — Output-ordering is a gauge.** **[USED — the main negative result]** Class-wise
+rescaling `p_k → c_k p_k` is absorbed into the rule's weights, so it cannot move the
+surface. Choosing the shifts as `−(max_x A + m)`, `−(max_x C + m)` orders *every* row.
+Hence every model has an ordered twin with identical VUS. Verified bit-for-bit.
+
+**I3 — Temperature scaling as part of the gauge.** **[REJECTED as unnecessary]** I first
+thought the ordered gauge needed `p → p^ε` as well as a class rescaling, to shrink the
+spread before shifting. It does not — a shift alone suffices, which makes the theorem
+cleaner (one class rescaling, nothing else). Temperature would only be needed if the goal
+were a *bounded* log-odds spread, which it is not.
+
+**I4 — "The constraint must reduce the dimension."** **[REJECTED]** The order chamber is
+an open subset of the simplex, still 2-D. No degrees of freedom are lost. (It *would* be
+1-D if the outputs were additionally forced onto a curve, e.g. `p ∝ softmax(θ·(1,2,3))` —
+that collapses to the ordinal single-marker mode of `roc3.ordinal`. Worth noting as a
+separate constraint, not implied by this one.)
+
+**I5 — "The chance level must change because the output space is 1/6 of the simplex."**
+**[REJECTED — tested]** No. If the scores are independent of the label, all six
+permutations are equally likely by exchangeability whatever region they live in. Measured
+0.172 at n = 400/class.
+
+**I6 — The master lemma: integrate the pointwise constraint over a decision region.**
+**[USED — the key move]** `π_i f_i < π_j f_j` integrated over `R_m` gives
+`π_i C[i,m] ≤ π_j C[j,m]`. Nine linear inequalities that bind *every* classifier. Once
+this was written down everything else fell out as corollaries.
+
+**I7 — Bounded likelihood ratio ⟹ bounded AUC.** **[USED]** A change-of-measure argument
+gives `AUC ≤ 1 − 1/(2R)` for `L = f_i/f_j ≤ R`, tight. Under the constraint `R = π_j/π_i`.
+Derived independently of I6 — and the two agree exactly in the binary case
+(`1 − π_i/(2π_j)`, verified to 9 decimals), which is what made me trust both.
+
+**I8 — Computing the ceiling by grid + LP.** **[USED as a cross-check]** `R²` tiny LPs.
+Slower than I9 but produces the ceiling as a *surface*, which is what the figure needs.
+
+**I9 — Computing the ceiling exactly by vertex enumeration.** **[USED — primary]** The
+feasible set is a polytope in 6 free variables with 18 facets; enumerate `C(18,6)` =
+18 564 six-subsets, solve, keep feasible points, project onto the diagonal, take the
+down-set volume of the hull (reusing `convex_hull_vus`). Exact, no resolution parameter.
+Agrees with I8 to `1e-5`.
+
+**I10 — Is the ceiling attainable by a single model?** **[OPEN — measured]** No, not
+exactly: the ceiling ranges over all classifiers on all worlds with the given priors,
+whereas one world exposes only a 2-parameter Bayes family. Constructed worlds captured
+37% → **89.3%** of the attainable volume as the posterior distribution was enriched.
+Concentrating mass near the chamber's extreme points beats a uniform lattice by 36 points,
+which is what the LP predicts (the optimum is at vertices). 80 random constrained worlds
+all respected the ceiling.
+
+**I11 — The order chamber's vertices are the whole intuition.** **[USED]**
+`T = {p₁≤p₂≤p₃}` is the triangle with vertices `(⅓,⅓,⅓)`, `(0,½,½)`, `(0,0,1)`. So the
+constraint says: *you can never be more than 1/3 sure of class 1, or more than 1/2 sure of
+class 2.* Every quantitative result is that sentence in another form. This also fixed a
+buggy first attempt at generating constrained worlds — parameterising the chamber
+barycentrically by these three vertices makes ordered posteriors automatic, where my
+hand-rolled formula produced violations.
+
+**I12 — Strictness ties.** **[FINDING]** Two of the three chamber vertices have ties
+(`p₁=p₂=p₃` and `p₂=p₃`), so a uniform shrink toward the interior does *not* produce
+strict ordering. The offset has to be increasing in `k`: `p·(1−6ε) + ε·(1,2,3)`.
+
+**I13 — Renormalise the index.** **[USED — the practical payoff]**
+`VUS_normalized = (VUS − 1/6)/(VUS_max(π) − 1/6)`. On the worked example a model scoring
+0.550 — mediocre against 1.000 — is capturing **86.6%** of everything attainable.
+
+**I14 — Degenerate case as a consistency check.** **[FINDING]** If `π_i = π_j`, the lemma
+forces `C[i,·] = C[j,·]`: the two classes are indistinguishable to every classifier and
+the ceiling collapses to chance. An ordered posterior with balanced priors is not a hard
+problem, it is an impossible one — which is exactly why the §0 diagnostic works.
+
+**I15 — Ceilings on the scalar metrics too.** **[USED]** `max accuracy = π₃` in closed
+form (the constant rule is Bayes-optimal and unbeatable — verified against the LP to 6
+decimals); balanced accuracy and worst-class sensitivity by LP.
 
 ---
 

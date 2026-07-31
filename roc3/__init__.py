@@ -22,6 +22,15 @@ correctly sorting a trio of cases drawn one from each class.
 See ``docs/PLAN.md`` for the derivation and ``docs/IDEAS_LOG.md`` for what was tried.
 """
 
+from .constrained import (
+    check_order_constraint,
+    constrained_report,
+    format_constrained_report,
+    gauge_normalize,
+    normalized_vus,
+    to_ordered_gauge,
+    vus_ceiling,
+)
 from .core import (
     CHANCE_VUS,
     OperatingSurface,
@@ -53,9 +62,16 @@ __all__ = [
     "OrdinalSurface",
     "achievable",
     "binary_auc",
+    "check_order_constraint",
     "confusion_report",
+    "constrained_report",
     "forced_choice_profile",
+    "format_constrained_report",
     "format_summary",
+    "gauge_normalize",
+    "normalized_vus",
+    "to_ordered_gauge",
+    "vus_ceiling",
     "hand_till_m",
     "hum",
     "hypervolume3d",
