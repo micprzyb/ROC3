@@ -38,6 +38,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/03_threshold_case_study.py
 .venv/bin/python experiments/04_constrained.py         # the 0<p1<p2<p3<1 propositions
 .venv/bin/python experiments/05_tutorial_numbers.py    # every number in the tutorial
+.venv/bin/python experiments/06_constrained_numbers.py # every number in CONSTRAINED.md
 ```
 
 ## Quick start
@@ -185,7 +186,8 @@ print(format_constrained_report(constrained_report(y, proba)))
 The mechanism in one line: *the constraint says you can never be more than 1/3 sure of
 class 1, or more than 1/2 sure of class 2.*
 
-Full derivations, proofs and measurements: [`docs/CONSTRAINED.md`](docs/CONSTRAINED.md).
+Full derivations, proofs and worked numbers: [`docs/CONSTRAINED.md`](docs/CONSTRAINED.md),
+written as a tutorial on one three-atom world you can check by hand.
 
 ![ceiling](figures/08_constrained_ceiling.png)
 
@@ -215,7 +217,7 @@ roc3/
 docs/
   TUTORIAL.md    start here: the whole construction worked by hand, every symbol defined
   PLAN.md        the design: every approach considered, the maths, the chosen one
-  CONSTRAINED.md the logically-constrained case: gauge invariance vs. the hard ceiling
+  CONSTRAINED.md the logically-constrained case, worked: gauge invariance vs. the ceiling
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study

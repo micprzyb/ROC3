@@ -352,7 +352,8 @@ def achievable_diagonals(priors):
         raise RuntimeError("empty feasible polytope; are the priors strictly ordered?")
     S = np.stack([V[:, 0], V[:, 3], 1.0 - V[:, 4] - V[:, 5]], axis=1)
     S = np.clip(S, 0.0, 1.0)
-    return np.unique(np.round(S, 9), axis=0)
+    S = np.round(S, 9) + 0.0          # normalise signed zeros so -0.0 does not print
+    return np.unique(S, axis=0)
 
 
 def vus_ceiling(priors, *, method="exact", resolution=121) -> float:
