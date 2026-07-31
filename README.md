@@ -19,6 +19,12 @@ reproduces `sklearn.metrics.roc_auc_score` **to machine precision** (2×10⁻¹�
 
 ![clinical dashboard](figures/01_clinical_youden.png)
 
+> **New here? Start with [`docs/TUTORIAL.md`](docs/TUTORIAL.md).** It builds the whole
+> construction from scratch on a nine-sample toy dataset you can check by hand, defines
+> every symbol, and works through the pieces that are easy to state and hard to picture —
+> in particular what "the probability of correctly sorting a trio" actually means, with
+> the full six-way calculation written out.
+
 ---
 
 ## Install & run
@@ -31,6 +37,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/02_demo.py                # writes figures/
 .venv/bin/python experiments/03_threshold_case_study.py
 .venv/bin/python experiments/04_constrained.py         # the 0<p1<p2<p3<1 propositions
+.venv/bin/python experiments/05_tutorial_numbers.py    # every number in the tutorial
 ```
 
 ## Quick start
@@ -206,6 +213,7 @@ roc3/
   plots.py       the dashboards (matplotlib) + interactive plotly HTML
   datasets.py    synthetic problems with known ground truth, plus the wine demo
 docs/
+  TUTORIAL.md    start here: the whole construction worked by hand, every symbol defined
   PLAN.md        the design: every approach considered, the maths, the chosen one
   CONSTRAINED.md the logically-constrained case: gauge invariance vs. the hard ceiling
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
