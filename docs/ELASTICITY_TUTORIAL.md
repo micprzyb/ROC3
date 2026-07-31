@@ -1,8 +1,9 @@
 # Tutorial: grading a price-elasticity model that has no labels
 
 The long-form version of [`ELASTICITY.md`](ELASTICITY.md). Nothing is assumed beyond
-[`PRICETEST.md`](PRICETEST.md) §1. Every symbol is defined where it first appears, and
-**every number below is real** — regenerate the small worked example with
+[`PRICETEST.md`](PRICETEST.md) §1. Every symbol, convention and term is defined in
+§1.3–§1.5 and repeated in the [glossary](#11-glossary), and **every number below is
+real** — regenerate the small worked example with
 
 ```bash
 .venv/bin/python experiments/09_elasticity_tutorial_numbers.py   # the 900-customer toy
@@ -41,9 +42,9 @@ Contents
 ε  =  − (proportional change in quantity) / (proportional change in price)
 ```
 
-The minus sign is a convention that makes `ε` positive for normal goods (demand falls when
-price rises). `ε = 1` means a 1% price rise costs you 1% of demand; `ε = 3` means it costs
-you 3%.
+The minus sign is a convention that makes `ε` positive for an ordinary product — one whose
+demand falls when its price rises. `ε = 1` means a 1% price rise costs you 1% of demand;
+`ε = 3` means it costs you 3%.
 
 Proportional changes are logs, so the clean version is
 
@@ -51,8 +52,9 @@ Proportional changes are logs, so the clean version is
 ε  =  − d log(demand) / d log(price)
 ```
 
-We only have three prices, so we use the **arc elasticity** between two of them — a
-difference quotient rather than a derivative:
+Write **`β(p)`** for demand at price `p`. We only have three prices, so instead of a
+derivative we use the **arc elasticity** — the same thing as a difference quotient between
+two of them:
 
 ```
 ε  =  − [ log β(p_high) − log β(p_low) ] / [ log p_high − log p_low ]
@@ -61,25 +63,62 @@ difference quotient rather than a derivative:
 ### 1.2 It is a property of a *customer*
 
 `β(p)` here is not market demand. It is **one person's** probability of buying at price
-`p`. So `ε(x)` is that person's own sensitivity: a bargain-hunter has a large `ε`, a
+`p`. So elasticity is that person's own sensitivity: a bargain-hunter has a large `ε`, a
 must-have-it buyer has a small one. That per-customer quantity is what we want to model,
 and what we can never observe.
 
-### 1.3 Notation used from here on
+### 1.3 Symbols
 
 | symbol | meaning |
 |---|---|
-| `x` | a customer's covariates (whatever features you have) |
-| `k` | the arm, `1` = cheapest, `2` = middle, `3` = dearest |
+| `x` | a customer's **covariates** — whatever features you have on them (age, history, channel, …) |
+| `k` | the **arm**, i.e. one price cell of the experiment. `1` = cheapest, `2` = middle, `3` = dearest |
 | `m_k` | the **price multiplier** of arm `k`; here `(0.9, 1.0, 1.1)` for −10% / 0% / +10% |
-| `q_k` | the **randomisation probability** of arm `k`; here `1/3` each, and known by design |
-| `β_k(x)` | `P(buy | customer x, shown arm k)` — the customer's demand curve. **Never observed.** |
-| `Y` | 1 if the customer bought, 0 otherwise. **Observed.** |
-| `K` | which arm the customer was actually shown. **Observed.** |
-| `p_k(x)` | `P(arm = k | x, bought)` — what your classifier predicts |
-| `π_k` | `P(arm = k | bought)` — arm prevalence among buyers |
-| `ε(x)` | the customer's arc elasticity |
-| `V(π)` | the average revenue per customer under pricing policy `π` |
+| `q_k` | the **randomisation probability** (also called the **propensity**) of arm `k` — the chance a customer is put in it. Here `1/3` each, and known by design because you chose it |
+| `β_k(x)` | `P(buy \| customer x, shown arm k)` — the customer's **demand curve**, three numbers. This is `β(p)` of §1.1 evaluated at that customer and at price `m_k`. **Never observed** |
+| `Y` | 1 if the customer bought, 0 otherwise. **Observed** |
+| `K` | which arm the customer was actually shown. **Observed** |
+| `p_k(x)` | `P(arm = k \| x, bought)` — what your arm classifier predicts |
+| `ε(x)` | customer `x`'s arc elasticity |
+| `c(x)` | a per-customer normalising constant that appears in §4 and cancels everywhere |
+| `π` | a **policy** — a rule that assigns one price to each customer. `π(x)` is the arm it picks for `x` |
+| `V(π)` | the **policy value**: average revenue per customer if you priced according to `π` |
+| `τ(x)` | the **uplift** `β₁(x) − β₃(x)` (§8) — an absolute difference, *not* the elasticity |
+| `ψ_i` | the doubly-robust **pseudo-outcome** for customer `i` (§8) |
+| `D_k` | a **purchase rate**: the fraction of the customers shown arm `k` who bought. Computed within a group when we bin (§6) |
+| `n_k` | how many customers were shown arm `k` (within whatever group is under discussion) |
+| `w` | the weight vector of `roc3`'s decision rule `argmax_k w_k p_k(x)` — see [`TUTORIAL.md`](TUTORIAL.md) §3 |
+
+### 1.4 Conventions
+
+| notation | meaning |
+|---|---|
+| `β̂`, `p̂`, `ε̂` | a **hat** means "estimated from data", as opposed to the unknown true value |
+| `1{A}` | the **indicator**: 1 if statement `A` is true, 0 if not. Used to pick out a subset inside an average |
+| `argmax_k f(k)` | the **value of `k`** that makes `f(k)` largest — not the largest value itself. `argmax` of `(0.4, 0.9, 0.2)` is 2 |
+| `a ∝ b` | "`a` is **proportional to** `b`": they differ by a positive factor that does not depend on the index being varied |
+| `E[Z \| x]` | the **conditional expectation** of `Z` — its average over all customers having covariates `x` |
+| `Σ_j` | sum over all arms `j` |
+| `sd(Z)` | the **standard deviation** of `Z` — the typical size of its fluctuation |
+| **standard error** | the standard deviation of an *estimate*, i.e. how much it would move if you reran the experiment. Written `± …` throughout |
+| **p-value** | the probability of seeing a result at least this extreme if the stated null hypothesis were true. Small = the null is hard to sustain |
+
+### 1.5 Words that carry weight
+
+* **Identified** — a quantity is *identified* if it is pinned down exactly by the
+  distribution you can observe, given infinite data. Unidentified means no estimator can
+  ever recover it, however much data you collect: the information simply is not there.
+  §2 turns on the fact that elasticity is unidentified per customer and identified per
+  group.
+* **Oracle** — a hypothetical model handed the true answer. Used to grade the *method*: if
+  a check cannot recognise the oracle, the check is broken.
+* **Out-of-fold** — a prediction for a customer made by a model that was fitted *without*
+  that customer, e.g. via cross-validation. Needed whenever predictions are used to form
+  groups (§6.5).
+* **Nuisance model** — a model you do not care about in itself, fitted only because some
+  estimator needs it as an input. `β̂` inside `ψ` (§8) is one.
+* **Precision** — the reciprocal of the variance. "Weighting by precision" means trusting
+  the better-measured bins more.
 
 One constant recurs everywhere: `log(m₃/m₁) = log(1.1/0.9) = **0.20067**`. It is the
 denominator of every elasticity in this document.
@@ -184,7 +223,9 @@ allocated equally.)
 
 ### 4.2 Worked on the toy world
 
-Posteriors are just the demand curves divided by their own row sums:
+Posteriors are just the demand curves divided by their own row sums (`p_cheap`, `p_mid`
+and `p_exp` are just readable names for `p₁`, `p₂`, `p₃`; `Σβ` is the row sum
+`β₁ + β₂ + β₃`):
 
 | type | Σβ | `p_cheap` | `p_mid` | `p_exp` |
 |---|---|---|---|---|
@@ -271,8 +312,11 @@ Discounting them is pure margin given away. That is what a personalisation model
 ```python
 from roc3.elasticity import revenue_optimal_policy
 pol = revenue_optimal_policy(proba, (0.9, 1.0, 1.1))          # revenue
+unit_cost = 0.6          # what the item costs you; NB nothing to do with c(x) in section 4
 pol = revenue_optimal_policy(proba, (0.9, 1.0, 1.1),
-                             unit_margin=(0.9-c, 1.0-c, 1.1-c))  # margin
+                             unit_margin=(0.9 - unit_cost,
+                                          1.0 - unit_cost,
+                                          1.1 - unit_cost))       # margin, not revenue
 ```
 
 ---
@@ -293,8 +337,11 @@ purchase rate in arm k, within the group   =   the group's average β_k
 which is a demand curve. Read the elasticity off it. **No model, no assumptions beyond the
 randomisation you already ran.**
 
-The model supplies the groups; the data supplies the answer. This is the GATES idea
-(Chernozhukov, Demirer, Duflo & Fernández-Val, *Econometrica* 2025).
+The model supplies the groups; the data supplies the answer. This is the **GATES** idea —
+*Group Average Treatment Effects Sorted* — from Chernozhukov, Demirer, Duflo &
+Fernández-Val, *Econometrica* 2025. "Sorted" because the groups are formed by sorting
+customers on the model's own prediction. The name is used throughout as shorthand for
+"bin by prediction, measure the realised effect per bin".
 
 ### 6.2 Worked by hand
 
@@ -316,6 +363,9 @@ from roc3.elasticity import gates_elasticity, blp_slope
 g = gates_elasticity(arm, bought, eps, n_bins=5)   # arm/bought for ALL customers
 blp_slope(g)                                        # -> slope, intercept, p-values
 ```
+
+(`blp` is for **Best Linear Predictor** — the straight line that best predicts the realised
+elasticity from the predicted one. Its slope is the calibration number of §6.4.)
 
 ### 6.3 A model with no signal
 
@@ -345,6 +395,9 @@ its precision.
 | ≈ 1 | calibrated | the predicted elasticities mean what they say |
 
 On the 600,000-customer run, with three real models:
+
+where `p(no signal)` is the p-value of the test that the calibration slope is 0 — small
+means the model demonstrably knows *something* about elasticity:
 
 | model | corr(ε̂, ε_true) | spread | slope | p(no signal) |
 |---|---|---|---|---|
@@ -431,8 +484,9 @@ To see why, consider a model with **no usable features**. It learns the marginal
 policy is a constant rule worth `0.57000` — *exactly* flat-cheap.
 
 Against flat-mid that is **+14.00%**. Against the best flat price it is **+0.00%**. The
-apparent skill was entirely the discovery that the cheap price beats the middle one, which
-you would have found by reading the topline.
+apparent skill was entirely the discovery that the cheap price beats the middle one — which
+you would have found by reading the experiment's **topline**, the three overall per-arm
+purchase rates, without fitting anything at all.
 
 The same thing happens at scale. On the 600k run:
 
@@ -468,8 +522,11 @@ the model is wrong — hence "doubly robust". `E[ψ | x] = τ(x)` exactly.
 
 *Verified:* mean `ψ = +0.1513` against a true mean uplift of `+0.1548`.
 
-It is a genuinely useful tool, and it is why DR-based criteria dominate CATE model-
-selection benchmarks (Mahajan et al. 2023). But in this setting it has two traps.
+It is a genuinely useful tool, and it is why DR-based criteria dominate **CATE**
+model-selection benchmarks (Mahajan et al. 2023). *CATE* is the **Conditional Average
+Treatment Effect**, `E[effect | x]` — the general name for "the effect for customers who
+look like this". Elasticity and uplift are both CATEs, of different effects.
+But in this setting the pseudo-outcome has two traps.
 
 ### 8.2 Trap 1 — the target is a *difference*; elasticity is a *ratio*; neither is the decision
 
@@ -490,10 +547,16 @@ Spearman(true uplift,     true revenue gain)    +0.444
 Elasticity and uplift rank customers **almost independently**. So:
 
 > **The elasticity model is not automatically the right targeting score.** Neither is
-> uplift. For a pricing decision the score to rank on is the predicted *revenue gain*,
-> `max_k m_k β̂_k(x) − m_base β̂_base(x)`.
+> uplift. For a pricing decision the score to rank on is the predicted **revenue gain** —
+> how much more you expect to earn from `x` by giving them their best price instead of the
+> price everyone would otherwise get:
+> `max_k m_k β̂_k(x) − m_base β̂_base(x)`, where `base` is whichever arm is your default
+> (the middle one here).
 
-`elasticity_report` computes that and uses it for the targeting curve. Decide what you are
+`elasticity_report` computes that and ranks on it for the **targeting curve** — a plot of
+policy value against the fraction of customers you personalise, taking the most promising
+first (the right-hand panel of the figure in §9). A model with real signal earns most of
+its gain in the first slice; one with none traces a straight line. Decide what you are
 ranking *for* before you choose a metric.
 
 ### 8.3 Trap 2 — never rank-correlate against ψ
@@ -501,7 +564,11 @@ ranking *for* before you choose a metric.
 `ψ` is a near-three-point variable: its value is dominated by which arm the customer
 landed in and whether they bought. Those atoms depend on `x`, so **the ranks of ψ encode
 `β(x)`**, not the uplift. The result is a rank correlation that swings with the nuisance
-model even though AIPW is unbiased throughout:
+model even though AIPW is unbiased throughout.
+
+Two correlations are compared below. **Pearson** is the ordinary linear correlation, which
+uses the values. **Spearman** is Pearson applied to the *ranks* — it asks only about
+ordering, which is normally a virtue with noisy data and is exactly the wrong choice here.
 
 | `β̂` used inside ψ | Pearson(ε_true, ψ) | Spearman(ε_true, ψ) |
 |---|---|---|
@@ -599,23 +666,42 @@ In descending order of how much weight to put on them:
 
 | term | meaning | where |
 |---|---|---|
-| arc elasticity | `−[log β(p_hi) − log β(p_lo)] / [log p_hi − log p_lo]` | §1.1 |
-| arm | one price cell of the experiment | §1.3 |
+| **arc elasticity** | `−[log β(p_hi) − log β(p_lo)] / [log p_hi − log p_lo]` | §1.1 |
+| **arm** | one price cell of the experiment | §1.3 |
 | `β_k(x)` | customer `x`'s purchase probability at arm `k`; never observed | §1.3 |
-| `p_k(x)` | `P(arm = k \| x, bought)` — the classifier's output | §1.3 |
-| `q_k` | the randomisation probability of arm `k`; known by design | §1.3 |
-| demand curve | the vector `(β₁(x), β₂(x), β₃(x))` for one customer | §3 |
-| GATES | grouping by predicted effect and measuring the realised effect per group | §6 |
-| calibration slope | slope of realised on predicted across bins; 1 = calibrated | §6.4 |
-| spread | top-bin minus bottom-bin realised elasticity | §6.4 |
-| policy | a rule assigning a price to each customer | §5 |
-| policy value `V(π)` | average revenue per customer under that rule | §7 |
-| IPW | inverse-probability weighting — reweight matched customers by `1/q` | §7.1 |
-| AIPW / doubly robust | IPW plus a model-based term; same guarantee, less noise | §7.2 |
-| pseudo-outcome `ψ` | a noisy per-customer variable whose conditional mean is the effect | §8.1 |
-| uplift | `β_cheap − β_expensive`, an absolute difference (not elasticity) | §8.2 |
-| targeting curve | revenue as a function of what fraction you personalise | §10 |
-| congeniality bias | a loss built from one learner's pseudo-outcome favours that learner | §9 |
+| `p_k(x)` | `P(arm = k \| x, bought)` — the arm classifier's output | §1.3 |
+| `q_k` | the randomisation probability (propensity) of arm `k`; known by design | §1.3 |
+| `m_k` | the price multiplier of arm `k` | §1.3 |
+| `D_k`, `n_k` | purchase rate in arm `k`, and how many customers were shown it | §1.3 |
+| `c(x)` | the per-customer normalising constant that cancels out of every ratio | §4.1 |
+| `w` | the weight vector of the rule `argmax_k w_k p_k(x)` | §1.3, §5 |
+| **hat** (`β̂`) | "estimated from data", as opposed to the true value | §1.4 |
+| **indicator** `1{A}` | 1 if `A` holds, 0 otherwise | §1.4 |
+| **argmax** | the *index* that maximises, not the maximum | §1.4 |
+| **∝** | proportional to, up to a factor free of the index being varied | §1.4 |
+| **identified** | pinned down exactly by the observable distribution, given infinite data | §1.5 |
+| **oracle** | a hypothetical model handed the true answer; used to grade the method | §1.5 |
+| **out-of-fold** | predicted by a model fitted without that customer | §1.5 |
+| **nuisance model** | a model fitted only because an estimator needs it as input | §1.5 |
+| **precision** | the reciprocal of the variance | §1.5 |
+| **demand curve** | the vector `(β₁(x), β₂(x), β₃(x))` for one customer | §3 |
+| **GATES** | *Group Average Treatment Effects Sorted*: bin by predicted effect, measure the realised effect per bin | §6.1 |
+| **BLP** | *Best Linear Predictor*: the line fitted through the bins; its slope is the calibration | §6.2 |
+| **calibration slope** | slope of realised on predicted across bins; 1 = calibrated | §6.4 |
+| **spread** | top-bin minus bottom-bin realised elasticity | §6.4 |
+| **policy** `π` | a rule assigning a price to each customer | §1.3, §5 |
+| **policy value** `V(π)` | average revenue per customer under that rule | §7 |
+| **IPW** | inverse-probability weighting — reweight matched customers by `1/q` | §7.1 |
+| **AIPW / doubly robust** | IPW plus a model-based term; same guarantee, less noise | §7.2 |
+| **flat policy** | a rule that offers the same price to everyone | §7.3 |
+| **CATE** | *Conditional Average Treatment Effect*, `E[effect \| x]` | §8.1 |
+| **pseudo-outcome** `ψ` | a noisy per-customer variable whose conditional mean is the effect | §8.1 |
+| **uplift** `τ(x)` | `β_cheap − β_expensive`, an absolute difference (not elasticity) | §8.2 |
+| **revenue gain** | `max_k m_k β̂_k(x) − m_base β̂_base(x)`; the right score for pricing | §8.2 |
+| **Pearson / Spearman** | linear correlation / the same on ranks | §8.3 |
+| **targeting curve** | policy value as a function of what fraction you personalise | §8.2, §10 |
+| **congeniality bias** | a loss built from one learner's pseudo-outcome favours that learner | §9 |
+| **paired bootstrap** | resample customers once and score both models on the same resample | §9 |
 
 ---
 
@@ -639,9 +725,12 @@ separates customers by elasticity, but elasticity is not the same as revenue gai
 Rank on predicted revenue gain instead.
 
 **"Why not just fit a model of `β_k(x)` directly and read the elasticity off it?"** You
-can, and it is a perfectly good alternative — an S-learner over `(x, arm)`. The point of
-§4 is that if you already have the arm classifier, you already have the elasticity, for
-free and exactly. Either way the *validation* in §6–§9 is the same, because the validation
+can, and it is a perfectly good alternative: fit one model of `P(buy)` on the pooled data
+with the arm included as a feature, then read off its prediction at each of the three
+prices. (In the causal-inference literature that is called an **S-learner** — "S" for
+*single*, one model covering all treatment arms, as against a **T-learner** that fits a
+separate model per arm.) The point of §4 is only that if you already have the arm
+classifier, you already have the elasticity, for free and exactly. Either way the *validation* in §6–§9 is the same, because the validation
 does not care how the prediction was produced.
 
 **"Do I need the `P(buy | x)` model?"** Only for absolute revenue forecasts and for AIPW.
