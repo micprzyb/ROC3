@@ -206,6 +206,85 @@ for a, b, c, win in detail:
     if win != (1, 2, 3):
         print(f"  ({a}, {b}, {c})  ->  labelled {win}")
 
+head("§7.2.1  Does 'give each case its own argmax' work?")
+
+
+def own_argmax(trio):
+    return tuple(int(np.argmax(P[i])) + 1 for i in trio)
+
+
+def lap_winner(trio):
+    sc = [sum(L[trio[j], sg[j] - 1] for j in range(3)) for sg in perms]
+    return perms[int(np.argmax(sc))]
+
+
+def greedy_winner(trio):
+    M = P[list(trio)].copy()
+    out = [0, 0, 0]
+    for _ in range(3):
+        j, k = np.unravel_index(np.argmax(M), M.shape)
+        out[j] = int(k) + 1
+        M[j, :] = -1.0
+        M[:, k] = -1.0
+    return tuple(out)
+
+
+all_trios = [(a, b, c) for a in by_class[1] for b in by_class[2] for c in by_class[3]]
+is_perm = [t for t in all_trios if len(set(own_argmax(t))) == 3]
+agree = [t for t in is_perm if own_argmax(t) == lap_winner(t)]
+greedy_bad = [t for t in all_trios if greedy_winner(t) != lap_winner(t)]
+print(f"  per-case argmax is a PERMUTATION in {len(is_perm)}/{len(all_trios)} trios")
+print(f"     and when it is, it matches the optimum {len(agree)}/{len(is_perm)} times"
+      f"   (a theorem, not luck -- see the tutorial)")
+print(f"  trios where it is NOT a permutation, so the shortcut is undefined:"
+      f" {len(all_trios) - len(is_perm)}")
+for t in all_trios:
+    if len(set(own_argmax(t))) < 3:
+        print(f"     ({NAMES[t[0]]},{NAMES[t[1]]},{NAMES[t[2]]}) -> each wants "
+              f"{own_argmax(t)}")
+print(f"\n  greedy tie-break matches the optimum "
+      f"{len(all_trios) - len(greedy_bad)}/{len(all_trios)} times; it fails on:")
+for t in greedy_bad:
+    g, o = greedy_winner(t), lap_winner(t)
+    pg = float(np.prod([P[t[j], g[j] - 1] for j in range(3)]))
+    po = float(np.prod([P[t[j], o[j] - 1] for j in range(3)]))
+    print(f"     ({NAMES[t[0]]},{NAMES[t[1]]},{NAMES[t[2]]}): greedy {g} product "
+          f"{pg:.4f}   optimum {o} product {po:.4f}")
+
+head("§7.5  The trio where every PAIRWISE check passes but the trio is still wrong")
+A, B, C = L[:, 0] - L[:, 1], L[:, 0] - L[:, 2], L[:, 1] - L[:, 2]
+n_pair, n_all, offenders = 0, 0, []
+for t in all_trios:
+    a, b, c = t
+    pair = (A[a] > A[b], C[b] > C[c], B[a] > B[c])
+    cyc = (A[a] + C[b] > B[c], B[a] > A[b] + C[c])
+    n_pair += all(pair)
+    n_all += all(pair + cyc)
+    if all(pair) and not all(cyc):
+        offenders.append(t)
+print(f"  trios passing all three PAIRWISE checks : {n_pair}/{len(all_trios)}")
+print(f"  trios actually sorted correctly          : {n_all}/{len(all_trios)}")
+for t in offenders:
+    a, b, c = t
+    print(f"\n  offender: ({NAMES[a]},{NAMES[b]},{NAMES[c]})   "
+          f"per-case argmax {own_argmax(t)} (not a bijection)")
+    pr = np.array([np.prod([P[t[j], sg[j] - 1] for j in range(3)]) for sg in perms])
+    post = pr / pr.sum()
+    label = {(1, 2, 3): "TRUTH", (2, 1, 3): "swap 1<->2", (1, 3, 2): "swap 2<->3",
+             (3, 2, 1): "swap 1<->3", (2, 3, 1): "3-cycle", (3, 1, 2): "3-cycle"}
+    for sg, pv, q in sorted(zip(perms, pr, post), key=lambda z: -z[1]):
+        print(f"     {sg}  product {pv:.6f}  posterior {q:.4f}   {label[sg]}")
+
+head("§7.3 / §7.4  Posterior over assignments for the two worked trios")
+for trio in [(0, 3, 6), (2, 4, 8)]:
+    pr = np.array([np.prod([P[trio[j], sg[j] - 1] for j in range(3)]) for sg in perms])
+    post = pr / pr.sum()
+    print(f"\n  ({NAMES[trio[0]]},{NAMES[trio[1]]},{NAMES[trio[2]]})   "
+          f"products sum to {pr.sum():.4f}")
+    for sg, pv, q in sorted(zip(perms, pr, post), key=lambda z: -z[1]):
+        print(f"     {sg}  product {pv:.5f}  posterior {q:.4f}"
+              + ("   <- truth" if sg == (1, 2, 3) else ""))
+
 head("§8  The five algebraic conditions, checked against the brute force")
 A, B, C = L[:, 0] - L[:, 1], L[:, 0] - L[:, 2], L[:, 1] - L[:, 2]
 print(f"{'sample':>7} {'A=logp1-logp2':>15} {'B=logp1-logp3':>15} {'C=logp2-logp3':>15}")

@@ -492,15 +492,58 @@ label `σ_c`", the six are
 (1,2,3)   (1,3,2)   (2,1,3)   (2,3,1)   (3,1,2)   (3,2,1)
 ```
 
-**Step 4 — the key you sort on.** Score each candidate assignment by how likely the model
-thinks it is. Assuming the three cases are independent, the likelihood of assignment `σ`
-is the **product**
+### 7.2.1 "Surely you just read off each case's best class?"
+
+This is the natural objection, and it deserves a straight answer, because **it is a
+theorem — and it is usually not applicable.**
+
+> **Proposition.** Let `m_j = argmax_k p_k(x_j)` be each case's own favourite class. *If*
+> `(m_a, m_b, m_c)` happens to be a permutation (all three different), then it **is** the
+> best assignment, and there is nothing to compute.
+>
+> *Proof.* For any assignment `σ`, `Π_j p_{σ(j)}(x_j) ≤ Π_j max_k p_k(x_j) = Π_j p_{m_j}(x_j)`.
+> The right-hand side is an upper bound over all `σ`; if `m` is itself a permutation then
+> that bound is attained by `σ = m`. ∎
+
+So your instinct is right whenever it applies. The catch is the word *if*. Of the 27 trios
+in the toy dataset, the three per-case favourites are all different in only **10**. In the
+other **17** they are not a bijection at all:
+
+```
+(x1, x4, x9) -> each wants (1, 2, 2)      (x1, x6, x7) -> each wants (1, 3, 3)
+(x1, x5, x9) -> each wants (1, 2, 2)      (x1, x6, x8) -> each wants (1, 3, 3)
+(x2, x4, x9) -> each wants (1, 2, 2)      (x3, x6, x8) -> each wants (2, 3, 3)   ... and 11 more
+```
+
+Two cases both want class 2; nobody wants class 1. **The rule is not wrong here — it is
+undefined.** You are forced to break the tie, and *how you break it* is precisely the
+assignment problem. (Where it is defined, it agreed with the full computation 10 times out
+of 10, exactly as the proposition promises.)
+
+**Would a greedy tie-break do?** "Take the largest probability anywhere, lock that pair in,
+delete its row and column, repeat." Reasonable, and it is right 24 times out of 27 here.
+It fails on:
+
+| trio | greedy says | the actual optimum | products |
+|---|---|---|---|
+| (x1, x6, x8) | (1,3,2) | **(1,2,3)** | 0.0875 vs **0.1225** |
+| (x2, x6, x8) | (1,3,2) | **(1,2,3)** | 0.0688 vs **0.0963** |
+| (x3, x6, x7) | (2,1,3) | **(1,2,3)** | 0.0473 vs **0.0735** |
+
+This is the standard failure of greedy on an assignment problem: locking in one locally
+attractive pair can force two bad ones. Note that in all three cases greedy is *pessimistic*
+— it declares the model wrong when it was actually right. With only `3! = 6` candidates
+there is no reason to approximate: just check them all.
+
+**Step 4 — the key you sort on.** Score each candidate assignment by how plausible the
+model finds it *as a whole*. Under independence, the likelihood of assignment `σ` is the
+**product**
 
 ```
 p_{σₐ}(x⁽ᵃ⁾) · p_{σ_b}(x⁽ᵇ⁾) · p_{σ_c}(x⁽ᶜ⁾)
 ```
 
-or, in logs (which is what the code uses, and what is easier to read),
+or, in logs (which is what the code uses, and what keeps the arithmetic stable),
 
 ```
 score(σ) = log p_{σₐ}(x⁽ᵃ⁾) + log p_{σ_b}(x⁽ᵇ⁾) + log p_{σ_c}(x⁽ᶜ⁾)
@@ -508,14 +551,35 @@ score(σ) = log p_{σₐ}(x⁽ᵃ⁾) + log p_{σ_b}(x⁽ᵇ⁾) + log p_{σ_c}(
 
 Pick the `σ` with the largest score.
 
+**Those numbers are not arbitrary — they are posterior probabilities.** Given that the
+three cases are one of each class, Bayes gives
+`P(σ | the three cases) ∝ Π_j f_{σ(j)}(x_j)`, and writing the class-conditional density as
+`f_k(x) = p_k(x)·g(x)/π_k` turns that into
+
+```
+P(σ | the three cases)  ∝  Π_j p_{σ(j)}(x_j) · [ Π_j g(x_j) ] / [ Π_j π_{σ(j)} ]
+```
+
+The marginal term `Π_j g(x_j)` does not depend on `σ`, and neither does `Π_j π_{σ(j)}` —
+because `σ` is a *permutation*, that product is always `π₁π₂π₃`. Both cancel, leaving
+
+```
+P(σ | the three cases)  =  Π_j p_{σ(j)}(x_j)  /  Σ_{σ'} Π_j p_{σ'(j)}(x_j)
+```
+
+So dividing the six products by their sum gives an honest probability for each
+arrangement, and picking the largest is the Bayes-optimal play. The scores are the whole
+answer to "how sure is the model about this trio", not bookkeeping.
+
 **Step 5 — did you get it right?** The true assignment is `(1,2,3)` (case `a` really is
 class 1, etc.). `VUS₃AFC` is the fraction of trios where the winning `σ` is `(1,2,3)`.
 
-So: *what is being sorted* = three cases into three labels; *the key* = the total
-log-score of the whole assignment. It is an assignment problem, not three independent
-decisions.
+Summary of the notation: *what is being sorted* = three cases into three labels;
+*the key* = the total log-score of the whole assignment, equivalently its posterior
+probability. It is an assignment problem, not three independent decisions — and §7.5
+shows a case where that distinction changes the answer.
 
-### 7.3 Worked example — a trio the model gets right
+### 7.3 Worked example — a trio where your instinct already settles it
 
 Trio `(x1, x4, x7)`. The relevant slice of the log-score table:
 
@@ -526,20 +590,28 @@ Trio `(x1, x4, x7)`. The relevant slice of the log-score table:
    x7        −2.3026     −1.6094     −0.3567
 ```
 
-All six assignments, with the total log-score and the equivalent product:
+Each case's own favourite: x1 wants class 1 (`p₁ = 0.70`), x4 wants class 2 (`0.60`),
+x7 wants class 3 (`0.70`). All different — so by the proposition in §7.2.1 **the answer is
+already determined and no search is needed.** Here is the search anyway, to show it agrees
+and to see what the numbers look like:
 
-| assignment | how to read it | total log-score | product |
-|---|---|---|---|
-| **(1,2,3)** | x1→1, x4→2, x7→3 | **−1.2242** | **0.2940** ← winner, and true |
-| (1,3,2) | x1→1, x4→3, x7→2 | −3.5756 | 0.0280 |
-| (2,1,3) | x1→2, x4→1, x7→3 | −3.5756 | 0.0280 |
-| (2,3,1) | x1→2, x4→3, x7→1 | −5.5215 | 0.0040 |
-| (3,1,2) | x1→3, x4→1, x7→2 | −5.5215 | 0.0040 |
-| (3,2,1) | x1→3, x4→2, x7→1 | −5.1160 | 0.0060 |
+| assignment | how to read it | total log-score | product | posterior |
+|---|---|---|---|---|
+| **(1,2,3)** | x1→1, x4→2, x7→3 | **−1.2242** | **0.2940** | **0.808** ← winner, and true |
+| (1,3,2) | x1→1, x4→3, x7→2 | −3.5756 | 0.0280 | 0.077 |
+| (2,1,3) | x1→2, x4→1, x7→3 | −3.5756 | 0.0280 | 0.077 |
+| (3,2,1) | x1→3, x4→2, x7→1 | −5.1160 | 0.0060 | 0.017 |
+| (2,3,1) | x1→2, x4→3, x7→1 | −5.5215 | 0.0040 | 0.011 |
+| (3,1,2) | x1→3, x4→1, x7→2 | −5.5215 | 0.0040 | 0.011 |
 
-Check the winner by hand: `0.70 × 0.60 × 0.70 = 0.294`. ✓ **Correct.**
+Check the winner by hand: `0.70 × 0.60 × 0.70 = 0.294`. ✓ **Correct.** The posterior
+column is the product divided by the column total (0.364), so: *given these three cases,
+the model is 80.8% confident of this arrangement.*
 
-### 7.4 Worked example — a trio the model gets wrong
+**This example on its own is misleading** — it is the easy case, where you could have read
+the answer straight off. The next two are the ones that matter.
+
+### 7.4 Worked example — a trio where the shortcut is undefined
 
 Trio `(x3, x5, x9)` — the three hardest samples.
 
@@ -550,19 +622,68 @@ Trio `(x3, x5, x9)` — the three hardest samples.
    x9        −1.2040     −0.9163     −1.2040
 ```
 
-| assignment | total log-score | product |
-|---|---|---|
-| (1,2,3) — the truth | −3.3242 | 0.03600 |
-| (1,3,2) | −3.5066 | 0.03000 |
-| **(2,1,3)** | **−3.0523** | **0.04725** ← winner |
-| (2,3,1) | −3.3888 | 0.03375 |
-| (3,1,2) | −3.3524 | 0.03500 |
-| (3,2,1) | −3.5066 | 0.03000 |
+All three cases have the same favourite: x3 wants class 2 (`0.45`), x5 wants class 2
+(`0.40`), x9 wants class 2 (`0.40`). **`(2,2,2)` is not a permutation**, so "read off each
+case's best class" produces nothing at all here. You must choose *which* case gets to keep
+class 2 and what the other two get — and that is a genuine optimisation.
+
+| assignment | total log-score | product | posterior |
+|---|---|---|---|
+| **(2,1,3)** | **−3.0523** | **0.04725** | **0.223** ← winner |
+| (1,2,3) — the truth | −3.3242 | 0.03600 | 0.170 |
+| (3,1,2) | −3.3524 | 0.03500 | 0.165 |
+| (2,3,1) | −3.3888 | 0.03375 | 0.159 |
+| (1,3,2) | −3.5066 | 0.03000 | 0.142 |
+| (3,2,1) | −3.5066 | 0.03000 | 0.142 |
 
 The model prefers to call x3 "class 2" and x5 "class 1" — swapping them — because
 `0.45 × 0.35 × 0.30 = 0.04725` beats the truth's `0.30 × 0.40 × 0.30 = 0.036`. **Wrong.**
+The posteriors are all near 1/6, which is the model saying, correctly, that it has almost
+no idea.
 
-### 7.5 Averaging over all trios
+### 7.5 Worked example — the trio that proves pairwise checks are not enough
+
+This is the one that justifies the whole apparatus. Trio `(x3, x6, x8)`:
+
+```
+        p₁      p₂      p₃
+  x3   0.30    0.45    0.25       favourite: class 2
+  x6   0.15    0.35    0.50       favourite: class 3
+  x8   0.25    0.25    0.50       favourite: class 3
+```
+
+Favourites are `(2, 3, 3)` — again not a permutation. Now compare the truth against each
+rival **one at a time**:
+
+| rival | what it does to the truth | product | truth wins? |
+|---|---|---|---|
+| (1,2,3) — the truth | — | 0.052500 | — |
+| (2,1,3) | swaps labels **1 ↔ 2** | 0.033750 | ✅ yes |
+| (1,3,2) | swaps labels **2 ↔ 3** | 0.037500 | ✅ yes |
+| (3,2,1) | swaps labels **1 ↔ 3** | 0.021875 | ✅ yes |
+| (3,1,2) | 3-cycle | 0.009375 | ✅ yes |
+| **(2,3,1)** | **3-cycle** | **0.056250** | ❌ **no** |
+
+Read that carefully. **Every pairwise comparison says the model got this trio right.**
+Class 1 beats class 2, class 2 beats class 3, class 1 beats class 3 — all three checks
+pass. And yet the trio is sorted **wrong**, because rotating all three labels at once
+(x3→2, x6→3, x8→1) scores higher: `0.45 × 0.50 × 0.25 = 0.05625` against the truth's
+`0.30 × 0.35 × 0.50 = 0.0525`.
+
+That gap is invisible to any amount of pairwise analysis. On the whole toy dataset:
+
+```
+trios passing all three PAIRWISE checks : 21 / 27
+trios that are actually sorted correctly: 20 / 27
+```
+
+The missing one is exactly `(x3, x6, x8)`. **This is why VUS is not a function of the three
+pairwise AUCs, and why conditions 4 and 5 in §8 exist** — they are the two 3-cycles, and
+they have no two-class analogue. It is also the concrete reason a genuinely 3-class figure
+of merit is not the same thing as an average of binary ones (§15, "why not just average
+the three pairwise AUCs?").
+
+### 7.6 Averaging over all trios
 
 Doing that for all 27 trios: the correct assignment wins **20** times.
 
@@ -583,7 +704,7 @@ from roc3 import vus_forced_choice
 vus_forced_choice(y, P, classes=[1,2,3])     # 0.7407
 ```
 
-### 7.6 The 3AFC profile — a free diagnostic
+### 7.7 The 3AFC profile — a free diagnostic
 
 The six assignments' win-rates sum to 1, so they form a distribution. That distribution
 tells you *which confusion* is costing you:
@@ -606,14 +727,14 @@ fc = forced_choice_profile(y, P, classes=[1,2,3], method="exact")
 print(fc.profile_table(classes=[1,2,3]))
 ```
 
-### 7.7 Why chance is 1/6 and perfect is 1
+### 7.8 Why chance is 1/6 and perfect is 1
 
 * **Uninformative model**: the scores carry no information about the labels, so all six
   assignments are equally likely to win → 1/6.
 * **Perfect model**: `p(x) = (1,0,0)` for a class-1 case, etc. Only the true assignment
   has a nonzero product → 1.
 
-### 7.8 Any number of classes
+### 7.9 Any number of classes
 
 The same game with `c` classes is `HUM` (hypervolume under the manifold): draw one case
 per class, assign the `c` labels bijectively to maximise the total log-score (a linear
@@ -648,9 +769,10 @@ terms, the truth wins **iff all five of these hold**:
 | 4 | `A(x⁽ᵃ⁾) + C(x⁽ᵇ⁾) > B(x⁽ᶜ⁾)` | the 3-cycle 1→2→3 |
 | 5 | `B(x⁽ᵃ⁾) > A(x⁽ᵇ⁾) + C(x⁽ᶜ⁾)` | the 3-cycle 1→3→2 |
 
-Conditions 1–3 are pure rank comparisons — sample `a` must look more "1-vs-2" than sample
-`b` does, and so on. Conditions 4 and 5 are the genuinely three-way ones; they are the
-reason VUS is not just an average of pairwise AUCs.
+Conditions 1–3 are pure rank comparisons (the pairwise swaps of §7.5) — sample `a` must look more "1-vs-2" than sample
+`b` does, and so on. Conditions 4 and 5 are the genuinely three-way ones — the two 3-cycles. They are
+the reason VUS is not just an average of pairwise AUCs; §7.5 exhibits a trio that passes
+1–3 and fails 4.
 
 The `A, B, C` table for the toy data:
 
@@ -913,8 +1035,17 @@ trade-off is.
 
 **"Why not just average the three pairwise AUCs?"** You can (`hand_till_m`), and the
 library reports it. But it is a scalar with no surface, its chance level is 1/2 so it is
-not the volume of anything, and it is blind to genuinely three-way confusions —
-conditions 4 and 5 in §8 have no pairwise analogue.
+not the volume of anything, and it is blind to genuinely three-way confusions. §7.5 has an
+explicit trio that passes all three pairwise checks and is still sorted wrong, because
+rotating all three labels at once beats the truth. Conditions 4 and 5 in §8 are exactly
+those two rotations, and they have no two-class analogue.
+
+**"Surely the winning assignment is just each case's most likely class?"** When those
+three favourites happen to be all different, yes — provably (§7.2.1). But on the toy data
+that happens in only 10 of 27 trios; in the other 17 two cases want the same class, so the
+rule returns something that is not a permutation and is therefore not an answer at all.
+Greedy tie-breaking is a reasonable repair and is right 24 times out of 27 — but with only
+six candidates there is no reason to approximate.
 
 **"My VUS went up but accuracy went down."** Expected. VUS measures *ranking*, invariant
 to temperature and to class re-weighting (§8). Accuracy measures one specific operating
