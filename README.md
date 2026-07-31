@@ -40,6 +40,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/05_tutorial_numbers.py    # every number in the tutorial
 .venv/bin/python experiments/06_constrained_numbers.py # every number in CONSTRAINED.md
 .venv/bin/python experiments/07_pricetest.py           # the price-test case
+.venv/bin/python experiments/08_elasticity.py          # grading an elasticity model
 ```
 
 ## Quick start
@@ -195,6 +196,15 @@ detector. See [`docs/PRICETEST.md`](docs/PRICETEST.md).
 
 ![price-test ceiling](figures/09_pricetest_ceiling.png)
 
+**And the model is an elasticity model.** With equal randomisation the arm posterior *is*
+the demand curve up to a constant, so the arc elasticity comes out of it exactly, and the
+revenue-optimal personalised price is the ROC operating point with `w ∝ prices`. Grading
+that elasticity model is possible even though no customer's elasticity is ever observed —
+bin by prediction and measure each bin's realised elasticity from raw purchase rates, which
+randomisation alone justifies. See [`docs/ELASTICITY.md`](docs/ELASTICITY.md).
+
+![elasticity diagnostics](figures/10_elasticity_diagnostics.png)
+
 Full derivations, proofs and worked numbers: [`docs/CONSTRAINED.md`](docs/CONSTRAINED.md),
 written as a tutorial on one three-atom world you can check by hand.
 
@@ -219,6 +229,7 @@ roc3/
   ordinal.py     two-cut-point surface for ordered classes
   constrained.py ROC under the logical constraint 0 < p1 < p2 < p3 < 1
   pricetest.py   the randomised-price-test application, and its elasticity ceiling
+  elasticity.py  validating and comparing per-customer elasticity models
   thresholds.py  operating-point selection (7 criteria + constraints)
   metrics.py     Hand-Till M, one-vs-rest AUC, summary table
   inference.py   closed-form SE, bootstrap, permutation test
@@ -229,6 +240,7 @@ docs/
   PLAN.md        the design: every approach considered, the maths, the chosen one
   CONSTRAINED.md the logically-constrained case, worked: gauge invariance vs. the ceiling
   PRICETEST.md   a worked application: which price arm was this buyer in?
+  ELASTICITY.md  grading a price-elasticity model that has no labels to grade against
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study
