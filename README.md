@@ -41,6 +41,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/06_constrained_numbers.py # every number in CONSTRAINED.md
 .venv/bin/python experiments/07_pricetest.py           # the price-test case
 .venv/bin/python experiments/08_elasticity.py          # grading an elasticity model
+.venv/bin/python experiments/09_elasticity_tutorial_numbers.py   # its toy worked example
 ```
 
 ## Quick start
@@ -201,7 +202,9 @@ the demand curve up to a constant, so the arc elasticity comes out of it exactly
 revenue-optimal personalised price is the ROC operating point with `w ∝ prices`. Grading
 that elasticity model is possible even though no customer's elasticity is ever observed —
 bin by prediction and measure each bin's realised elasticity from raw purchase rates, which
-randomisation alone justifies. See [`docs/ELASTICITY.md`](docs/ELASTICITY.md).
+randomisation alone justifies. Start with
+[`docs/ELASTICITY_TUTORIAL.md`](docs/ELASTICITY_TUTORIAL.md); the compact results are in
+[`docs/ELASTICITY.md`](docs/ELASTICITY.md).
 
 ![elasticity diagnostics](figures/10_elasticity_diagnostics.png)
 
@@ -241,6 +244,7 @@ docs/
   CONSTRAINED.md the logically-constrained case, worked: gauge invariance vs. the ceiling
   PRICETEST.md   a worked application: which price arm was this buyer in?
   ELASTICITY.md  grading a price-elasticity model that has no labels to grade against
+  ELASTICITY_TUTORIAL.md   the same, built up on a 900-customer worked example
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study

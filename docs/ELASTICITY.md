@@ -9,6 +9,11 @@ Every number here comes from
 
 Prerequisites: [`PRICETEST.md`](PRICETEST.md) for the setting.
 
+> **New to this?** [`ELASTICITY_TUTORIAL.md`](ELASTICITY_TUTORIAL.md) builds the whole
+> thing up on a 900-customer toy you can check with a calculator: what elasticity is, why
+> there is no label and never will be, the two identities derived and worked by hand, and
+> inverse-probability weighting from scratch. This note is the compact results version.
+
 ---
 
 ## 0. The problem, and the way out
