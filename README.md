@@ -39,6 +39,7 @@ python3 -m venv .venv
 .venv/bin/python experiments/04_constrained.py         # the 0<p1<p2<p3<1 propositions
 .venv/bin/python experiments/05_tutorial_numbers.py    # every number in the tutorial
 .venv/bin/python experiments/06_constrained_numbers.py # every number in CONSTRAINED.md
+.venv/bin/python experiments/07_pricetest.py           # the price-test case
 ```
 
 ## Quick start
@@ -186,6 +187,14 @@ print(format_constrained_report(constrained_report(y, proba)))
 The mechanism in one line: *the constraint says you can never be more than 1/3 sure of
 class 1, or more than 1/2 sure of class 2.*
 
+**A worked application** — predicting which arm of a randomised price test a buyer was in.
+There the constraint is *derived* from monotone demand, and the ceiling turns out to be the
+measured demand response: at unit elasticity the attainable band is
+`[0.167, 0.219]`, so the raw VUS is meaningless and the ceiling doubles as a leakage
+detector. See [`docs/PRICETEST.md`](docs/PRICETEST.md).
+
+![price-test ceiling](figures/09_pricetest_ceiling.png)
+
 Full derivations, proofs and worked numbers: [`docs/CONSTRAINED.md`](docs/CONSTRAINED.md),
 written as a tutorial on one three-atom world you can check by hand.
 
@@ -209,6 +218,7 @@ roc3/
   vus.py         3AFC / HUM rank estimators, permutation profile
   ordinal.py     two-cut-point surface for ordered classes
   constrained.py ROC under the logical constraint 0 < p1 < p2 < p3 < 1
+  pricetest.py   the randomised-price-test application, and its elasticity ceiling
   thresholds.py  operating-point selection (7 criteria + constraints)
   metrics.py     Hand-Till M, one-vs-rest AUC, summary table
   inference.py   closed-form SE, bootstrap, permutation test
@@ -218,6 +228,7 @@ docs/
   TUTORIAL.md    start here: the whole construction worked by hand, every symbol defined
   PLAN.md        the design: every approach considered, the maths, the chosen one
   CONSTRAINED.md the logically-constrained case, worked: gauge invariance vs. the ceiling
+  PRICETEST.md   a worked application: which price arm was this buyer in?
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study
