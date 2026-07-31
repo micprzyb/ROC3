@@ -129,7 +129,8 @@ For a given `t`:
 * **Sensitivity** `Se₁ = P(predict 1 | truly 1)` — of the true positives, what fraction do
   we catch? Also called the true positive rate, TPR.
 * **Specificity** `Se₀ = P(predict 0 | truly 0)` — of the true negatives, what fraction do
-  we correctly leave alone? Equal to `1 − FPR`.
+  we correctly leave alone? Equal to `1 − FPR`, where FPR is the **false positive rate**,
+  the fraction of negatives wrongly called positive.
 
 The textbook ROC plots `TPR` against `FPR`. `roc3` uses `(Se₀, Se₁)` instead — the same
 information, but now **both axes mean "fraction correct for this class"**, which is the
@@ -553,8 +554,11 @@ Pick the `σ` with the largest score.
 
 **Those numbers are not arbitrary — they are posterior probabilities.** Given that the
 three cases are one of each class, Bayes gives
-`P(σ | the three cases) ∝ Π_j f_{σ(j)}(x_j)`, and writing the class-conditional density as
-`f_k(x) = p_k(x)·g(x)/π_k` turns that into
+`P(σ | the three cases) ∝ Π_j f_{σ(j)}(x_j)`, where `Π_j` is a product over the three
+cases and `f_k` is the **class-conditional density** — how class-`k` cases are spread over
+inputs, as opposed to `p_k(x)` which is the probability of the class given the input. The
+two are related by Bayes through the **marginal density** `g(x)` of inputs overall:
+`f_k(x) = p_k(x)·g(x)/π_k`. Substituting turns the display into
 
 ```
 P(σ | the three cases)  ∝  Π_j p_{σ(j)}(x_j) · [ Π_j g(x_j) ] / [ Π_j π_{σ(j)} ]
@@ -1011,6 +1015,11 @@ classical Nakas–Yiannoutsos VUS, and it is where the phrase in §7 comes from.
 | operating point | the triple `(S₁,S₂,S₃)` for one rule | §4.2 |
 | chance plane | `S₁+S₂+S₃ = 1` | §4.3 |
 | down-set / achievable region `R` | all requirement triples the model can meet | §6.1 |
+| `f_k(x)` | class-conditional density: how class-`k` cases are spread over inputs | §7.6 |
+| `g(x)` | marginal density of inputs, over all classes | §7.6 |
+| `Π_j` | product over the three cases of a trio | §7.6 |
+| TPR / FPR | true / false positive rate | §2.2 |
+| `resolution` | the rule-grid fineness argument of `roc_surface`; **not** the region `R` | §5, §15 |
 | Pareto front | operating points nothing else dominates on all three axes | §6.2 |
 | VUS | volume of `R`; equivalently the trio-sorting probability | §6, §7 |
 | `VUS_adjusted` | `(VUS − 1/6)/(1 − 1/6)`; chance 0, perfect 1 | §6.4 |
@@ -1053,8 +1062,10 @@ point. A model can rank perfectly and still be badly calibrated; the surface tel
 what re-weighting would buy.
 
 **"The VUS changed when I increased `resolution`."** By design. The geometric VUS
-converges **from below** as the rule grid is refined, roughly as `O(1/R)`. The default
-`resolution=160` is about 0.005 low; use 240–320 for anything you report. `VUS₃AFC` has no
+converges **from below** as the rule grid is refined, roughly as `1/resolution`. The
+default `resolution=160` is about 0.005 low; use 240–320 for anything you report.
+(`resolution` is the `roc_surface` argument of §5; it is unrelated to the achievable
+region `R` of §6.1.) `VUS₃AFC` has no
 grid and does not move.
 
 **"Two thresholds/criteria gave me the same answer."** `youden` and `balanced_accuracy`

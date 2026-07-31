@@ -133,11 +133,12 @@ as it must be. That is the method validating itself.
 ## 3. Validation 2 — what the policy is actually worth
 
 Ranking well is not the goal; making money is. Because the arms were randomised,
-inverse-probability weighting gives an **unbiased** estimate of the revenue any policy
-*would have* earned, with no modelling assumptions:
+inverse-probability weighting gives an **unbiased** estimate of the revenue any policy `d`
+*would have* earned, with no modelling assumptions (`π` is reserved for prevalence
+throughout this repo, so the policy is `d`):
 
 ```
-V(π) = mean_i  1{K_i = π(x_i)} / q_{K_i} · m_{K_i} · Y_i
+V(d) = mean_i  1{K_i = d(x_i)} / q_{K_i} · m_{K_i} · Y_i
 ```
 
 ```python

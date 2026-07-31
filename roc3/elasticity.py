@@ -292,7 +292,7 @@ def policy_value(arm, bought, policy, price_multipliers=(0.9, 1.0, 1.1), arm_pro
     Because the arms were randomised, inverse-probability weighting is **unbiased with no
     modelling assumptions**:
 
-        V(pi) = mean_i  1{K_i = pi(x_i)} / q_{K_i} * value_{K_i} * Y_i
+        V(d) = mean_i  1{K_i = d(x_i)} / q_{K_i} * value_{K_i} * Y_i
 
     Supplying ``beta_hat`` (an ``(n, K)`` estimate of ``P(buy | x, arm k)``) switches to
     the augmented (AIPW) estimator, which is far less noisy and still unbiased if either

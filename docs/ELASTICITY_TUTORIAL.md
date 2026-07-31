@@ -81,8 +81,8 @@ and what we can never observe.
 | `p_k(x)` | `P(arm = k \| x, bought)` — what your arm classifier predicts |
 | `ε(x)` | customer `x`'s arc elasticity |
 | `c(x)` | a per-customer normalising constant that appears in §4 and cancels everywhere |
-| `π` | a **policy** — a rule that assigns one price to each customer. `π(x)` is the arm it picks for `x` |
-| `V(π)` | the **policy value**: average revenue per customer if you priced according to `π` |
+| `d` | a **policy** — a rule that assigns one price to each customer. `d(x)` is the arm it picks for `x`. (The causal-inference literature usually writes `π` here; this repo reserves `π` for class prevalence, so the policy is `d`, for *decision*.) |
+| `V(d)` | the **policy value**: average revenue per customer if you priced according to `d` |
 | `τ(x)` | the **uplift** `β₁(x) − β₃(x)` (§8) — an absolute difference, *not* the elasticity |
 | `ψ_i` | the doubly-robust **pseudo-outcome** for customer `i` (§8) |
 | `D_k` | a **purchase rate**: the fraction of the customers shown arm `k` who bought. Computed within a group when we bin (§6) |
@@ -119,6 +119,12 @@ and what we can never observe.
   estimator needs it as an input. `β̂` inside `ψ` (§8) is one.
 * **Precision** — the reciprocal of the variance. "Weighting by precision" means trusting
   the better-measured bins more.
+
+**Notation is shared across this repo.** `π_k` always means the *prevalence* of class or
+arm `k` ([`TUTORIAL.md`](TUTORIAL.md), [`CONSTRAINED.md`](CONSTRAINED.md),
+[`PRICETEST.md`](PRICETEST.md)), never a policy — which is why the policy above is `d`.
+`m_k`, `q_k`, `β_k`, `p_k` and `D_k` mean the same thing here as in
+[`PRICETEST.md`](PRICETEST.md).
 
 One constant recurs everywhere: `log(m₃/m₁) = log(1.1/0.9) = **0.20067**`. It is the
 denominator of every elasticity in this document.
@@ -429,13 +435,13 @@ Ranking well is not the goal. Making money is.
 
 ### 7.1 Inverse-probability weighting, from scratch
 
-You want to know what a policy `π` *would have earned*, but you only ran the randomised
+You want to know what a policy `d` *would have earned*, but you only ran the randomised
 experiment. The trick: for the customers who happened to be shown the arm the policy would
 have chosen, you observe exactly what the policy would have got. Those customers are a
 random `q_k` fraction of the relevant group, so scale them up by `1/q_k`:
 
 ```
-V(π)  =  mean over ALL customers of    1{K_i = π(x_i)} / q_{K_i} · m_{K_i} · Y_i
+V(d)  =  mean over ALL customers of    1{K_i = d(x_i)} / q_{K_i} · m_{K_i} · Y_i
 ```
 
 With `q = 1/3`, every matching customer counts triple, and non-matching customers
@@ -689,8 +695,8 @@ In descending order of how much weight to put on them:
 | **BLP** | *Best Linear Predictor*: the line fitted through the bins; its slope is the calibration | §6.2 |
 | **calibration slope** | slope of realised on predicted across bins; 1 = calibrated | §6.4 |
 | **spread** | top-bin minus bottom-bin realised elasticity | §6.4 |
-| **policy** `π` | a rule assigning a price to each customer | §1.3, §5 |
-| **policy value** `V(π)` | average revenue per customer under that rule | §7 |
+| **policy** `d` | a rule assigning a price to each customer | §1.3, §5 |
+| **policy value** `V(d)` | average revenue per customer under that rule | §7 |
 | **IPW** | inverse-probability weighting — reweight matched customers by `1/q` | §7.1 |
 | **AIPW / doubly robust** | IPW plus a model-based term; same guarantee, less noise | §7.2 |
 | **flat policy** | a rule that offers the same price to everyone | §7.3 |
