@@ -1,0 +1,19 @@
+# virtualenvs
+.venv/
+venv/
+env/
+
+# python bytecode / build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
