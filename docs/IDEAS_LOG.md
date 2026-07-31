@@ -9,7 +9,20 @@ Companion documents: [`PLAN.md`](PLAN.md) (the design that came out of this),
 [`REFERENCES.md`](REFERENCES.md) (annotated sources).
 
 Legend: **[USED]** shipped · **[REJECTED]** tried/analysed and discarded ·
-**[DEFERRED]** sound but out of scope · **[FINDING]** empirical result.
+**[DEFERRED]** sound but out of scope · **[FINDING]** empirical result · **[OPEN]** unresolved.
+
+**Reading the codes.** Entries are numbered by section — `A1…A9` for what to plot, `B1…B9`
+for what to integrate, `C` computation, `D` visual design, `E` uncertainty, `F` findings,
+`G` bugs, `H` open questions, `I` the ordering constraint. **These are this document's own
+numbers and do not line up with [`PLAN.md`](PLAN.md)'s** — always cite across documents as
+"IDEAS_LOG §B6" or "PLAN §A4", never a bare code.
+
+**Acronyms used below.** VUS = volume under the surface. AUC = area under the curve.
+HUM = hypervolume under the manifold (the VUS past three classes). EEU = equal error
+utility, the cost assumption that makes the rule family two-parameter (PLAN §A5).
+LP = linear program. CVD = colour vision deficiency. OKLCH / OKLab = a perceptually
+uniform colour space; **ΔE** is a distance in it (×100 throughout) and **ΔL** a difference
+in its lightness coordinate. SE = standard error.
 
 ---
 

@@ -1,8 +1,22 @@
 # A 3-Dimensional Analogue of the ROC Curve and AUC for 3-Class Classifiers
 
-**Design document / research plan.**
-Companion files: [`IDEAS_LOG.md`](IDEAS_LOG.md) (every idea tried, incl. dead ends and numbers),
-[`REFERENCES.md`](REFERENCES.md) (annotated bibliography).
+**Design document / research plan.** This is the *why*, not the *how* — for a
+build-it-from-scratch introduction with worked numbers see [`TUTORIAL.md`](TUTORIAL.md),
+which also defines every symbol used below.
+Companion files: [`IDEAS_LOG.md`](IDEAS_LOG.md) (every idea tried, incl. dead ends and
+numbers), [`REFERENCES.md`](REFERENCES.md) (annotated bibliography).
+
+**Reading the codes.** §2 labels candidate *objects to plot* `A1…A5`, candidate *volume
+definitions* `V1…V6`, *normalisations* `N1…N3` and *visualisation variants* `F1…F6`.
+Separately, §1 labels the eight *properties* of the binary ROC that any generalisation
+must preserve `P1…P8`; those are referenced throughout §2 as the grading criteria.
+[`IDEAS_LOG.md`](IDEAS_LOG.md) keeps its own independent numbering — cite across documents
+as "PLAN §A4", "IDEAS_LOG §B6", never a bare code.
+
+**Acronyms.** AUC = area under the (ROC) curve. TPR / FPR = true / false positive rate.
+PPV = positive predictive value (precision). VUS = volume under the surface.
+HUM = hypervolume under the manifold, the VUS generalised past three classes.
+EEU = equal error utility (§A5). CI = confidence interval.
 
 ---
 
@@ -131,7 +145,7 @@ P7 ✓ (§3.4), P8 ✓ (convex-hull variant).
 * **A5d — arbitrary partitions of the simplex** (AUCμ-style). *Rejected:* not a 2-parameter
   family; no canonical sweep; not a surface.
 
-### A6. Definitions of "the volume"
+### V. Definitions of "the volume"
 
 | id | definition | status |
 |---|---|---|
@@ -142,23 +156,23 @@ P7 ✓ (§3.4), P8 ✓ (convex-hull variant).
 | **V5** | **Trinormal parametric VUS** — assume three Gaussians, integrate analytically. *Rejected as default:* strong distributional assumption; useful only for small samples. | rejected (noted) |
 | **V6** | Scurfield's information-theoretic `D` (channel capacity of the n-interval forced-choice observer). *Rejected:* not on a [0,1] scale with perfect = 1. | rejected (noted) |
 
-### A7. Normalisations
-* `VUS ∈ [0,1]`, perfect = 1, chance = **1/6 = 1/3!**, adversarial → 0.
-* `VUS_adj = (VUS − 1/6) / (1 − 1/6) = (6·VUS − 1)/5` — chance 0, perfect 1
+### N. Normalisations
+* **N1** `VUS ∈ [0,1]`, perfect = 1, chance = **1/6 = 1/3!**, adversarial → 0.
+* **N2** `VUS_adj = (VUS − 1/6) / (1 − 1/6) = (6·VUS − 1)/5` — chance 0, perfect 1
   (the 3-class analogue of Gini / Somers' D = 2·AUC − 1).
-* **Partial VUS** over a box `[ℓ₁,1]×[ℓ₂,1]×[ℓ₃,1]`, normalised by the box volume — for when
+* **N3** **Partial VUS** over a box `[ℓ₁,1]×[ℓ₂,1]×[ℓ₃,1]`, normalised by the box volume — for when
   only the high-sensitivity corner matters (analogue of partial AUC).
 
-### A8. Visualisation variants (all implemented; see §4)
-1. Parametric `trisurf` of `{(S₁,S₂,S₃)(w)}` — faithful to Mossman, but can fold / be hard to read.
-2. **Monotone envelope** `Z(u,v) = max{ S₃(w) : S₁(w) ≥ u, S₂(w) ≥ v }` — the surface *as a
+### F. Visualisation variants (all implemented; see §4)
+**F1** Parametric `trisurf` of `{(S₁,S₂,S₃)(w)}` — faithful to Mossman, but can fold / be hard to read.
+**F2** **Monotone envelope** `Z(u,v) = max{ S₃(w) : S₁(w) ≥ u, S₂(w) ≥ v }` — the surface *as a
    graph*, guaranteed monotone; `∫∫Z du dv = VUS` *literally*. **This is the primary 3-D panel.**
-3. **Ternary weight map** — the *dual* picture: barycentric plot of `w ∈ Δ²` with iso-contours
+**F3** **Ternary weight map** — the *dual* picture: barycentric plot of `w ∈ Δ²` with iso-contours
    of `S₁,S₂,S₃`. This is the panel you actually read thresholds off.
-4. **Iso-slices** — for fixed `S₃ ≥ z`, the achievable `(S₁,S₂)` frontier; a contour map of the surface.
-5. Cost-space dual (Drummond–Holte style) — *considered, deferred*: for 3 classes the cost
+**F4** **Iso-slices** — for fixed `S₃ ≥ z`, the achievable `(S₁,S₂)` frontier; a contour map of the surface.
+**F5** Cost-space dual (Drummond–Holte style) — *considered, deferred*: for 3 classes the cost
    space is also 2-D and the ternary map (3) already serves the purpose.
-6. Interactive HTML (plotly) with hover showing `w`, `(S₁,S₂,S₃)` and the confusion matrix.
+**F6** Interactive HTML (plotly) with hover showing `w`, `(S₁,S₂,S₃)` and the confusion matrix.
 
 ---
 
