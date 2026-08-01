@@ -153,9 +153,125 @@ The bias is not subtle and it is not a simulator artefact: any model whose `elas
 is evaluated at the customer's own quoted price has it. `true_elasticity_control` exists for
 this reason, and every grouped diagnostic must use a common reference price.
 
-## 3. Status
+## 3. Restoring the familiar constraint — two routes, and how they relate
 
-The simulator, the decision layer and the diagnostics are in `elasticity_lab/insurance.py`. This document records
+Under unequal allocation the admissible set is still a **triangle**, just not the usual one.
+`{b : b_1/\pi_1 \ge b_2/\pi_2 \ge b_3/\pi_3}` is cut from the simplex by two homogeneous
+linear inequalities, so its vertices are $e_1$, $(\pi_1,\pi_2,0)/(\pi_1+\pi_2)$ and $\pi$
+itself — measured at 0.1/0.8/0.1:
+
+| standard chamber $\{v_1 \ge v_2 \ge v_3\}$ | admissible region |
+|---|---|
+| (1, 0, 0) | (1, 0, 0) |
+| (0.5, 0.5, 0) | (0.111, 0.889, 0) |
+| (⅓, ⅓, ⅓) | (0.1, 0.8, 0.1) |
+| area 0.1667 | area **0.0889** |
+
+The map $b \mapsto (b_k/\pi_k)/\sum_j(b_j/\pi_j)$ carries the second onto the first, exactly
+(`max err 0.00e+00`). It is the **gauge map** of [`CONSTRAINED.md`](CONSTRAINED.md) with
+$c_k = 1/\pi_k$, so by the gauge theorem **VUS is bit-for-bit invariant under it** — verified,
+`max diff 0.00e+00`.
+
+So there are two routes to the ordinary $p_1 \ge p_2 \ge p_3$ machinery, and they are not the
+same thing:
+
+| | what it changes | mean ε | effective sample |
+|---|---|---|---|
+| `balance="weights"` — weight converters by $1/\pi_k$ | the training **objective** | 1.894 | **42.5%** |
+| `balance="oversample"` — resample instead | the training objective | 1.846 | 100%* |
+| `balance="none"` + `to_balanced_gauge` | only the **coordinates** | 1.842 | 100% |
+
+Same VUS for all three, necessarily. **Different fitted models**, because a weighted
+log-loss is a different loss. Weighting spends 57% of the effective sample to buy
+coordinates the transformation gives for free — so on this book the transformation is the
+better default, though the difference in accuracy is small.
+
+*(oversampling replaces weight variance with resampling variance rather than removing it.)*
+
+Worth noting: even in balanced coordinates the *unconstrained* fit violates the ordering for
+about 43% of quotes, so the constraint is doing real work rather than rubber-stamping.
+
+## 4. The model set, graded
+
+`experiments/18_insurance_models.py`, 300,000 quotes, 70/30 split, graded against
+`true_elasticity_control` (mean 2.115, sd 1.233).
+
+| model | mean ε | bias | RMSE | corr | % negative |
+|---|---|---|---|---|---|
+| `conversion_glm` | 1.720 | −0.395 | **0.856** | **0.837** | 0 |
+| `glm_then_gbm` (price hidden) | 1.720 | −0.395 | 0.858 | 0.835 | 0 |
+| `glm_then_gbm` (price shown) | 1.729 | −0.386 | 0.869 | 0.812 | 0 |
+| `conversion_gbm` | 1.790 | −0.325 | 1.164 | 0.502 | 0.1% |
+| `arm_posterior` (none, isotonic) | 2.061 | **−0.055** | 1.473 | 0.439 | 0 |
+| `tlearner` | 1.895 | −0.221 | 1.524 | 0.480 | **8.6%** |
+| `arm_posterior` (weights, isotonic) | 2.170 | +0.055 | 1.584 | 0.436 | 0 |
+| `arm_posterior` (weights, free) | 1.894 | −0.221 | 1.773 | 0.443 | **13.7%** |
+
+Five things worth reading off it.
+
+**The GLM wins, and partly for a rigged reason.** The simulator's demand *is* a logit, so
+`ConversionGLM` is correctly specified and $\varepsilon = \beta(1-s)$ is exact rather than
+approximate. That advantage would not survive a misspecified world. What *would* survive is
+the structural one from §1.5: it pools all three arms, so it uses the 80% control traffic
+that the arm-based methods cannot.
+
+**Two-stage with the price hidden ties the GLM to three decimals** — as it must, since stage
+two cannot touch the price derivative. That is a correctness check, not a finding. **With the
+price shown it is slightly worse** (0.869 vs 0.856): the GBM re-imports the flattening
+problem onto the correction term, which is the predicted failure of the naive residual
+approach.
+
+**The arm-posterior model has the best level and the worst spread.** Bias −0.055 against the
+GLM's −0.395 — it is nearly unbiased, because it assumes nothing about the shape of the
+demand curve — but its RMSE is 1.47 and its GATES is badly over-dispersed (predicted 0.24 →
+4.76 across bins where the realised range is only 0.69 → 1.81). It is the unbiased-but-noisy
+member of the set, and the right way to use it is as a check on the GLM's level rather than
+as a per-customer scorer.
+
+**The constraint earns its place.** Unconstrained, the arm-posterior model reports
+upward-sloping demand for **13.7%** of quotes; with the isotonic constraint, **0%**, by
+construction. The T-learner, which has no constraint available to it, sits at 8.6%.
+
+**Only the GLM's GATES is monotone.** Realised elasticity by predicted quintile: 0.50, 1.29,
+1.95, 2.68, 3.07 against predicted 0.66, 1.35, 1.83, 2.22, 2.54 — the ranking is right and
+the spread is if anything *understated*. Neither the GBM nor the arm-posterior model is
+monotone.
+
+## 5. What it is all worth — the sobering part
+
+Every policy evaluated by inverse-propensity weighting on held-out quotes, which is unbiased
+because the allocation is known.
+
+| policy | profit/quote | se | vs best flat | in se |
+|---|---|---|---|---|
+| Lerner via `conversion_glm` | 86.36 | 2.88 | +0.16 | **+0.06** |
+| **all dear (+10% for everyone)** | **86.20** | 2.98 | — | — |
+| Lerner via `glm_then_gbm` (price shown) | 86.12 | 2.87 | −0.08 | −0.03 |
+| Lerner via `conversion_gbm` | 85.47 | 2.84 | −0.73 | −0.26 |
+| Lerner via `tlearner` | 82.97 | 2.32 | −3.22 | −1.39 |
+| Lerner via `arm_posterior` | 78.9–79.9 | ~2.1 | −6.3 to −7.2 | **−3.0 to −3.5** |
+| all control | 75.41 | 0.82 | −10.78 | −13.1 |
+| all cheap (−10%) | 55.96 | 1.77 | −30.24 | −17.1 |
+
+**No targeted policy beats charging everyone +10%.** The best is 0.06 standard errors above
+it — indistinguishable — and three of them are *significantly worse*. Meanwhile the flat
+move itself is worth **+14.3%** on profit per quote (75.41 → 86.20) at 13 standard errors.
+
+The honest conclusion for this book: **the money is in the level, not the targeting.** That
+is the same `lift_over_uniform` lesson as the retail work ([`ELASTICITY_MODELS.md`](ELASTICITY_MODELS.md)
+§5.4), arriving independently in a completely different setting, and it is worth taking
+seriously before anyone builds a personalisation pipeline.
+
+Two caveats in the other direction. With 10% of traffic per side arm, a targeted policy is
+evaluated on ~9,600 effective quotes, so **anything smaller than about 4.6 in this table is
+invisible** — the experiment cannot detect a personalisation gain below roughly 5%. And the
+Lerner rule was discretised onto the three prices the test actually ran; a real deployment
+would price on a continuum, where the GLM's ranking (corr 0.84) has more room to pay.
+
+## 6. Status
+
+The simulator, the model set, the decision layer and the diagnostics are in
+`elasticity_lab/insurance.py`. This document records
 the structure of the problem, which is what determines the models; results follow once the
 benchmark has run.
 

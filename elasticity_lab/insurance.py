@@ -49,7 +49,9 @@ from .pricelevels import isotonic_decreasing
 __all__ = ["MotorQuoteConfig", "make_quote_panel", "QUOTE_FEATURES",
            "ConversionModel", "ConversionGLM", "ConversionGBM", "TLearnerConversion",
            "ArmPosteriorModel", "profit_curve", "optimal_price", "policy_profit",
-           "realised_elasticity_by_bin", "arm_posterior_constraint_check"]
+           "realised_elasticity_by_bin", "arm_posterior_constraint_check",
+           "to_balanced_gauge", "constraint_triangle_vertices", "GLMThenGBM",
+           "MOTOR_MODELS", "true_conversion_matrix"]
 
 
 # =======================================================================================
@@ -273,9 +275,18 @@ def policy_profit(d: pd.DataFrame, chosen_arm: np.ndarray) -> dict:
     w = np.where(match, 1.0 / pi, 0.0)
     profit = d["converted"].to_numpy() * (price - d["claims_cost"].to_numpy())
     tot = w.sum()
-    return {"profit_per_quote": float((w * profit).sum() / tot) if tot > 0 else np.nan,
-            "conversion": float((w * d["converted"].to_numpy()).sum() / tot)
-            if tot > 0 else np.nan,
+    if tot <= 0:
+        return {"profit_per_quote": np.nan, "se": np.nan, "conversion": np.nan,
+                "matched_quotes": 0, "ess": 0.0, "pct_arm_cheap": np.nan,
+                "pct_arm_dear": np.nan}
+    val = float((w * profit).sum() / tot)
+    # Standard error of the weighted mean.  Reporting it is not optional here: with only
+    # 10% of traffic in each side arm, a policy that recommends them is evaluated on ~9,000
+    # effective quotes, and two policies half a currency unit apart are indistinguishable.
+    # A ranked table without this invites reading noise as a result.
+    se = float(np.sqrt((w ** 2 * (profit - val) ** 2).sum()) / tot)
+    return {"profit_per_quote": val, "se": se,
+            "conversion": float((w * d["converted"].to_numpy()).sum() / tot),
             "matched_quotes": int(match.sum()),
             "ess": float(w.sum() ** 2 / np.maximum((w ** 2).sum(), 1e-12)),
             "pct_arm_cheap": float(np.mean(np.asarray(chosen_arm) == 0)),
@@ -356,3 +367,440 @@ def arm_posterior_constraint_check(b: np.ndarray, arm_probs) -> dict:
             "pct_posterior_monotone": float(dec_b.mean()),
             "note": "the first is the real constraint; the second is what it degenerates "
                     "to only when allocation is equal"}
+
+
+# =======================================================================================
+# restoring the familiar constraint under unequal allocation
+# =======================================================================================
+def to_balanced_gauge(b: np.ndarray, arm_probs) -> np.ndarray:
+    """Map the arm posterior to what it would have been under **equal** allocation.
+
+        b  |-->  (b_k / pi_k) / sum_j (b_j / pi_j)
+
+    Two facts make this the right way to handle ``pi = (0.1, 0.8, 0.1)``.
+
+    **It is the gauge map of** ``CONSTRAINED.md`` with ``c_k = 1/pi_k``.  So by the gauge
+    theorem the ROC surface and every VUS estimator are **bit-for-bit unchanged** by it:
+    whatever a model's VUS was on the raw posterior, it is the same here.  Nothing about
+    discrimination is gained or lost; only the coordinates change.
+
+    **It carries the constraint region onto the standard ordered chamber.**  The set
+    ``{b in simplex : b_1/pi_1 >= b_2/pi_2 >= b_3/pi_3}`` is cut out of the simplex by two
+    homogeneous linear inequalities, so it is itself a **triangle** — with vertices
+    ``e_1``, ``(pi_1, pi_2, 0)/(pi_1+pi_2)`` and ``pi`` — and this map sends it to the
+    familiar ``{v_1 >= v_2 >= v_3}``, whose vertices are ``e_1``, ``(1,1,0)/2``,
+    ``(1,1,1)/3``.  :func:`constraint_triangle_vertices` returns both and
+    ``experiments/18_insurance_models.py`` checks the correspondence numerically.
+
+    So there are two equivalent routes to the usual ``p_1 < p_2 < p_3`` machinery, and they
+    are **not** the same thing in finite samples:
+
+    ``balance="weights"`` (or ``"oversample"``)
+        change the *training objective* so the fitted posterior is already in balanced
+        coordinates.  A different model comes out, because a weighted log-loss is a
+        different loss.
+    ``balance="none"`` + this function
+        leave the fit alone and change *coordinates afterwards*.  Same model, relabelled,
+        and — by the gauge theorem — necessarily the same VUS.
+
+    The first spends effective sample size (the 10% arms get weight 10); the second spends
+    none.  Which wins is an empirical question and is measured, not assumed.
+    """
+    b = np.asarray(b, float)
+    pi = np.asarray(arm_probs, float)
+    pi = pi / pi.sum()
+    v = b / pi[None, :]
+    return v / v.sum(axis=1, keepdims=True)
+
+
+def constraint_triangle_vertices(arm_probs) -> dict:
+    """The constraint region is a triangle; return its vertices, and the standard one's.
+
+    Under unequal allocation the set of *admissible* posteriors is not the usual ordered
+    chamber but its image under the gauge — a triangle with a different shape and a
+    different area.  Seeing the two side by side is the quickest way to understand why
+    enforcing ``b_1 >= b_2 >= b_3`` at 0.1/0.8/0.1 is enforcing the wrong thing.
+    """
+    pi = np.asarray(arm_probs, float)
+    pi = pi / pi.sum()
+    K = len(pi)
+    std = [np.eye(K)[0],
+           np.array([1.0] * 2 + [0.0] * (K - 2)) / 2,
+           np.ones(K) / K]
+    mapped = []
+    for v in std:
+        w = pi * v
+        mapped.append(w / w.sum())
+    return {"standard_chamber": np.array(std), "admissible_region": np.array(mapped),
+            "arm_probs": pi}
+
+
+# =======================================================================================
+# the model set
+# =======================================================================================
+class ConversionModel:
+    """Common interface for every motor model.
+
+    ``elasticity(df)`` is evaluated **at the control price by default**, not at the price
+    the customer happened to be quoted.  That is not a detail: because ``eps = beta(1-s)``
+    depends on the price, grouping on the quoted-price elasticity selects a different
+    population into each arm and biases every grouped diagnostic (``docs/INSURANCE.md``
+    §2.1 — the least-elastic bin came out at 0.31 against a true 0.53).
+    """
+
+    name = "base"
+
+    def __init__(self, **params):
+        self.params = params
+
+    def fit(self, d):                                        # pragma: no cover
+        raise NotImplementedError
+
+    def conversion(self, d, log_price=None):                 # pragma: no cover
+        raise NotImplementedError
+
+    def elasticity(self, d, at="control"):                   # pragma: no cover
+        raise NotImplementedError
+
+    def _log_price(self, d, at):
+        lp = d["log_technical_premium"].to_numpy(float)
+        if at == "control":
+            return lp
+        if at == "quoted":
+            return d["log_price"].to_numpy(float)
+        return lp + float(np.log(at))
+
+    def __repr__(self):
+        return f"{self.name}({', '.join(f'{k}={v}' for k, v in self.params.items())})"
+
+
+def _design(d, log_price):
+    X = d[QUOTE_FEATURES].to_numpy(float)
+    return np.column_stack([X, log_price])
+
+
+class ConversionGLM(ConversionModel):
+    """Logistic regression of conversion on log price and the rating features.
+
+    ``s = sigmoid(a'x - beta log p)`` and therefore ``eps = beta (1 - s)`` in closed form —
+    no finite differences, no step-size choice, and the elasticity is guaranteed positive
+    and correctly shaped along the price ladder.  It pools all three arms, so it uses the
+    80% control traffic as well as the 20% that carries the price variation, which is why
+    the crudest model in the set is hard to beat when only 10% sits in each side arm.
+    """
+
+    name = "conversion_glm"
+
+    def __init__(self, C: float = 1.0):
+        super().__init__(C=C)
+
+    def fit(self, d):
+        from sklearn.linear_model import LogisticRegression
+        lp = d["log_price"].to_numpy(float)
+        X = _design(d, lp)
+        self.mu_, self.sd_ = X.mean(0), np.where(X.std(0) > 1e-12, X.std(0), 1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.m_ = LogisticRegression(C=self.params["C"], max_iter=2000).fit(
+                (X - self.mu_) / self.sd_, d["converted"].to_numpy(int))
+        # de-standardise the price coefficient: beta is minus it
+        self.beta_ = float(-self.m_.coef_[0, -1] / self.sd_[-1])
+        return self
+
+    def conversion(self, d, log_price=None):
+        lp = d["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+        X = (_design(d, lp) - self.mu_) / self.sd_
+        return self.m_.predict_proba(X)[:, 1]
+
+    def elasticity(self, d, at="control"):
+        s = self.conversion(d, self._log_price(d, at))
+        return self.beta_ * (1.0 - s)
+
+
+class ConversionGBM(ConversionModel):
+    """Gradient-boosted conversion (an S-learner), elasticity by finite difference.
+
+    Flexible in the covariates and, unlike the GLM, free to let the price effect interact
+    with them.  The cost is the one from ``MODELS.md`` §3.4: a boosted tree is piecewise
+    constant in log price, so the finite-difference step ``delta`` is part of the estimator
+    and a step smaller than the distance to a price split returns noise.  ``delta``
+    defaults to the arm half-width, which is the only step the data actually supports.
+    """
+
+    name = "conversion_gbm"
+
+    def __init__(self, n_estimators: int = 400, learning_rate: float = 0.05,
+                 num_leaves: int = 31, min_child_samples: int = 100,
+                 reg_lambda: float = 1.0, delta: float = 0.10, seed: int = 0):
+        super().__init__(n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         reg_lambda=reg_lambda, delta=delta, seed=seed)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        p = {k: v for k, v in self.params.items() if k not in ("delta", "seed")}
+        self.m_ = lgb.LGBMClassifier(objective="binary", verbosity=-1, n_jobs=N_THREADS,
+                                     random_state=self.params["seed"],
+                                     force_col_wise=True, **p)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.m_.fit(_design(d, d["log_price"].to_numpy(float)),
+                        d["converted"].to_numpy(int))
+        return self
+
+    def conversion(self, d, log_price=None):
+        lp = d["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+        return self.m_.predict_proba(_design(d, lp))[:, 1]
+
+    def elasticity(self, d, at="control"):
+        lp = self._log_price(d, at)
+        h = self.params["delta"]
+        up = self.conversion(d, lp + h)
+        dn = self.conversion(d, lp - h)
+        # -d log s / d log p, central difference on the log scale
+        return -(np.log(np.maximum(up, 1e-12)) - np.log(np.maximum(dn, 1e-12))) / (2 * h)
+
+
+class TLearnerConversion(ConversionModel):
+    """One conversion model per arm — and a demonstration of what 0.1/0.8/0.1 costs.
+
+    The T-learner is the textbook way to use a randomised experiment: fit ``s_k(x)``
+    separately in each arm and difference.  It makes no functional-form assumption linking
+    the arms, which is its appeal.  With this allocation it also throws away the 80%
+    control traffic when estimating the side arms, so each of the two models that actually
+    carry the price signal sees a tenth of the data.  Expect it to be the noisiest member
+    of the set; that is the point of including it.
+    """
+
+    name = "tlearner_conversion"
+
+    def __init__(self, n_estimators: int = 300, learning_rate: float = 0.05,
+                 num_leaves: int = 15, min_child_samples: int = 200, seed: int = 0):
+        super().__init__(n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         seed=seed)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.mult_ = np.asarray(d.attrs["arm_multipliers"], float)
+        self.models_ = []
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        arm = d["arm"].to_numpy()
+        y = d["converted"].to_numpy(int)
+        for k in range(len(self.mult_)):
+            m = lgb.LGBMClassifier(objective="binary", verbosity=-1, n_jobs=N_THREADS,
+                                   random_state=self.params["seed"], force_col_wise=True,
+                                   **{k2: v for k2, v in self.params.items()
+                                      if k2 != "seed"})
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                m.fit(X[arm == k], y[arm == k])
+            self.models_.append(m)
+        return self
+
+    def _curve(self, d):
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        return np.column_stack([np.clip(m.predict_proba(X)[:, 1], 1e-6, 1 - 1e-6)
+                                for m in self.models_])
+
+    def conversion(self, d, log_price=None):
+        return self._curve(d)[np.arange(len(d)), d["arm"].to_numpy()]
+
+    def elasticity(self, d, at="control"):
+        s = self._curve(d)
+        lm = np.log(self.mult_)
+        # slope of log s on log multiplier, least squares across arms
+        x = lm - lm.mean()
+        ls = np.log(s)
+        return -(ls * x[None, :]).sum(1) / np.sum(x ** 2)
+
+
+class ArmPosteriorModel(ConversionModel):
+    """The **price-test-first** model: predict the arm from a converter, read off demand.
+
+    Fitted on converters only — a choice-based sample in the sense of Manski & Lerman
+    (1977) — so the posterior is ``b_k(x) = pi_k s_k(x) / sum_j pi_j s_j(x)`` and the demand
+    curve is recovered by dividing out the **known** allocation.  Because ``pi`` is known by
+    design rather than estimated, this is the one setting where the construction carries no
+    propensity-model risk at all.
+
+    ``balance`` decides how the unequal allocation is handled, and the two routes are
+    genuinely different (see :func:`to_balanced_gauge`):
+
+    ``"weights"``     weight each converter by ``1/pi_k``, so the fitted posterior is
+                      already the balanced one and the ordinary ``p_1 >= p_2 >= p_3``
+                      constraint applies directly.  Changes the loss, so changes the fit.
+    ``"oversample"``  the same idea by resampling rather than weighting.
+    ``"none"``        fit raw, then move to balanced coordinates afterwards.  Same fit,
+                      and by the gauge theorem necessarily the same VUS.
+
+    ``constraint`` is applied in the balanced coordinates, where it is the familiar one.
+    """
+
+    name = "arm_posterior"
+
+    def __init__(self, balance: str = "weights", constraint: str = "isotonic",
+                 n_estimators: int = 300, learning_rate: float = 0.05,
+                 num_leaves: int = 31, min_child_samples: int = 100,
+                 reg_lambda: float = 1.0, seed: int = 0):
+        super().__init__(balance=balance, constraint=constraint,
+                         n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         reg_lambda=reg_lambda, seed=seed)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.mult_ = np.asarray(d.attrs["arm_multipliers"], float)
+        self.pi_ = np.asarray(d.attrs["arm_probs"], float)
+        self.pi_ = self.pi_ / self.pi_.sum()
+        K = len(self.mult_)
+
+        conv = d[d["converted"] == 1]
+        X = conv[QUOTE_FEATURES].to_numpy(float)
+        arm = conv["arm"].to_numpy()
+        w = None
+        bal = self.params["balance"]
+        if bal == "weights":
+            w = 1.0 / self.pi_[arm]
+        elif bal == "oversample":
+            rng = np.random.default_rng(self.params["seed"])
+            reps = 1.0 / self.pi_[arm]
+            reps = reps / reps.min()
+            idx = np.repeat(np.arange(len(conv)), np.floor(reps).astype(int))
+            frac = reps - np.floor(reps)
+            idx = np.concatenate([idx, np.flatnonzero(rng.random(len(conv)) < frac)])
+            X, arm = X[idx], arm[idx]
+        elif bal != "none":
+            raise ValueError(f"unknown balance={bal!r}")
+        self.balanced_fit_ = bal in ("weights", "oversample")
+        self.ess_ = (float(w.sum() ** 2 / (w ** 2).sum()) / len(conv)) if w is not None \
+            else 1.0
+        self.n_converters_ = len(conv)
+
+        p = {k: v for k, v in self.params.items()
+             if k in ("n_estimators", "learning_rate", "num_leaves",
+                      "min_child_samples", "reg_lambda")}
+        self.m_ = lgb.LGBMClassifier(objective="multiclass", num_class=K, verbosity=-1,
+                                     n_jobs=N_THREADS, random_state=self.params["seed"],
+                                     force_col_wise=True, **p)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.m_.fit(X, arm, sample_weight=w)
+        return self
+
+    def posterior(self, d, balanced=False):
+        """``b_k(x)``.  ``balanced=True`` returns it in the equal-allocation gauge."""
+        b = np.clip(self.m_.predict_proba(d[QUOTE_FEATURES].to_numpy(float)), 1e-12, None)
+        b = b / b.sum(1, keepdims=True)
+        if balanced and not self.balanced_fit_:
+            b = to_balanced_gauge(b, self.pi_)
+        if not balanced and self.balanced_fit_:
+            # undo: the fitted object is already balanced, so raw = gauge by pi
+            w = b * self.pi_[None, :]
+            b = w / w.sum(1, keepdims=True)
+        return b
+
+    def demand_curve(self, d):
+        """``log s_k(x)`` up to an additive constant, in balanced coordinates."""
+        v = self.posterior(d, balanced=True)
+        ls = np.log(np.clip(v, 1e-12, None))
+        if self.params["constraint"] == "isotonic":
+            ls = isotonic_decreasing(ls)
+        elif self.params["constraint"] not in ("none",):
+            raise ValueError(f"unknown constraint={self.params['constraint']!r}")
+        return ls - ls.mean(axis=1, keepdims=True)
+
+    def conversion(self, d, log_price=None):
+        """Not available, deliberately.
+
+        The arm posterior identifies the **shape** of the demand curve — the ratios
+        ``s_k/s_j`` — and says nothing about its level, because the level cancels out of
+        Lemma 1.  Returning ``exp(log_s)`` anyway would look like a conversion probability
+        and score a log-loss of 8-9 against a real one of 0.52.  Raising is the honest
+        response; pair this model with any conversion model if a level is needed.
+        """
+        raise NotImplementedError(
+            "ArmPosteriorModel estimates the demand curve up to a constant and has no "
+            "conversion level; use .demand_curve() or .elasticity(), or pair it with a "
+            "ConversionGLM for the level.")
+
+    def elasticity(self, d, at="control"):
+        """Slope of the log demand curve against the log arm multiplier.
+
+        Note this is an **arc** elasticity across the tested prices, so it does not depend
+        on ``at`` — the construction never sees a price other than the three that were run.
+        That is a real limitation next to the GLM, which extrapolates by assumption.
+        """
+        ls = self.demand_curve(d)
+        x = np.log(self.mult_) - np.log(self.mult_).mean()
+        return -(ls * x[None, :]).sum(1) / np.sum(x ** 2)
+
+
+class GLMThenGBM(ConversionModel):
+    """Two-stage: a logistic GLM, then a GBM on what it leaves behind.
+
+    The actuarial **offset** construction (Yan et al. 2009; Wüthrich & Merz's CANN): stage
+    one fits an interpretable GLM, stage two boosts on the residual with the GLM's linear
+    predictor as ``init_score``.  Fitting on the residual and offsetting are the same thing.
+
+    ``stage2_sees_price`` is the interesting switch.  With it **off**, the price effect is
+    entirely the GLM's single coefficient — the predictions improve, the elasticity stays a
+    clean interpretable number, and the two concerns are decoupled.  With it **on**, the
+    GBM can correct the price effect and also re-imports the flattening problem onto the
+    correction.
+    """
+
+    name = "glm_then_gbm"
+
+    def __init__(self, stage2_sees_price: bool = False, C: float = 1.0,
+                 n_estimators: int = 300, learning_rate: float = 0.05,
+                 num_leaves: int = 31, min_child_samples: int = 100,
+                 delta: float = 0.10, seed: int = 0):
+        super().__init__(stage2_sees_price=stage2_sees_price, C=C,
+                         n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         delta=delta, seed=seed)
+
+    def _stage2_X(self, d, lp):
+        return _design(d, lp) if self.params["stage2_sees_price"] \
+            else d[QUOTE_FEATURES].to_numpy(float)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.glm_ = ConversionGLM(C=self.params["C"]).fit(d)
+        lp = d["log_price"].to_numpy(float)
+        s1 = np.clip(self.glm_.conversion(d, lp), 1e-6, 1 - 1e-6)
+        init = np.log(s1 / (1 - s1))                    # the GLM's linear predictor
+        p = {k: v for k, v in self.params.items()
+             if k in ("n_estimators", "learning_rate", "num_leaves", "min_child_samples")}
+        self.gbm_ = lgb.LGBMClassifier(objective="binary", verbosity=-1, n_jobs=N_THREADS,
+                                       random_state=self.params["seed"],
+                                       force_col_wise=True, **p)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.gbm_.fit(self._stage2_X(d, lp), d["converted"].to_numpy(int),
+                          init_score=init)
+        return self
+
+    def conversion(self, d, log_price=None):
+        lp = d["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+        s1 = np.clip(self.glm_.conversion(d, lp), 1e-6, 1 - 1e-6)
+        init = np.log(s1 / (1 - s1))
+        raw = self.gbm_.predict(self._stage2_X(d, lp), raw_score=True)
+        return 1.0 / (1.0 + np.exp(-(init + raw)))
+
+    def elasticity(self, d, at="control"):
+        lp = self._log_price(d, at)
+        if not self.params["stage2_sees_price"]:
+            # stage 2 cannot touch the price derivative, so the elasticity is exactly the
+            # GLM's -- beta*(1-s) at the TWO-STAGE conversion estimate, which is better
+            # calibrated than the GLM's own
+            return self.glm_.beta_ * (1.0 - self.conversion(d, lp))
+        h = self.params["delta"]
+        up = self.conversion(d, lp + h)
+        dn = self.conversion(d, lp - h)
+        return -(np.log(np.maximum(up, 1e-12)) - np.log(np.maximum(dn, 1e-12))) / (2 * h)
+
+
+MOTOR_MODELS = {m.name: m for m in (ConversionGLM, ConversionGBM, TLearnerConversion,
+                                    ArmPosteriorModel, GLMThenGBM)}
