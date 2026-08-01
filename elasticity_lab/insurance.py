@@ -52,7 +52,9 @@ __all__ = ["MotorQuoteConfig", "make_quote_panel", "QUOTE_FEATURES",
            "realised_elasticity_by_bin", "arm_posterior_constraint_check",
            "to_balanced_gauge", "constraint_triangle_vertices", "GLMThenGBM",
            "MOTOR_MODELS", "true_conversion_matrix", "profit_regret",
-           "profit_weight", "lerner_price", "experiment_cost"]
+           "profit_weight", "lerner_price", "experiment_cost", "ConversionGBMv2",
+           "ConversionGLMv2", "AIPWArmEffects", "AnchoredTLearner", "MOTOR_MODELS_V2",
+           "ENGINEERED", "add_engineered"]
 
 
 # =======================================================================================
@@ -85,6 +87,15 @@ class MotorQuoteConfig:
     loss_ratio: float = 0.68
     #: sd of the log technical premium across customers
     premium_sd: float = 0.45
+    #: shape of the demand curve.  ``"logit"`` is the world ConversionGLM is exactly right
+    #: about, so any benchmark run only there is rigged in its favour.  The others break
+    #: that free lunch (PLAN_INSURANCE_V2 I12):
+    #:   ``"probit"``  same index, a different link -- mild misspecification
+    #:   ``"kinked"``  a shopping-behaviour threshold in the index: below a competitive
+    #:                 position the customer does not shop at all, above it they do
+    #:   ``"mixed"``   the link's curvature varies across customers, so no single
+    #:                 parametric form fits everyone
+    link: str = "logit"
     seed: int = 0
 
     def to_dict(self) -> dict:
@@ -99,6 +110,42 @@ QUOTE_FEATURES = [
     "shopping_intensity", "channel_aggregator", "log_technical_premium",
     "log_competitor_index",
 ]
+
+
+def _apply_link(eta, link, d=None):
+    """Map the linear index to a conversion probability.
+
+    Only ``"logit"`` makes :class:`ConversionGLM` correctly specified; the others exist so
+    that "a flexible model beats a GLM" can be a finding rather than an artefact of the
+    simulator agreeing with the GLM's functional form.
+    """
+    eta = np.asarray(eta, float)
+    if link == "logit":
+        return 1.0 / (1.0 + np.exp(-eta))
+    if link == "probit":
+        from scipy.stats import norm
+        return norm.cdf(eta * 0.5875)                 # scaled so the two links roughly agree
+    if link == "kinked":
+        # a shopping threshold: below it the customer barely reacts, above it they do.
+        # Piecewise-linear in the index, which no single-index GLM can represent.
+        kink = np.where(eta > 0.0, eta, 0.45 * eta)
+        return 1.0 / (1.0 + np.exp(-kink))
+    if link == "mixed":
+        # curvature varies by customer, so no one link fits the book
+        if d is None or "shopping_intensity" not in d:
+            raise ValueError("the 'mixed' link needs the covariate frame")
+        z = d["shopping_intensity"].to_numpy(float)
+        t = 0.6 + 0.8 / (1.0 + np.exp(-(z - z.mean()) / max(z.std(), 1e-9)))
+        return 1.0 / (1.0 + np.exp(-eta * t))
+    raise ValueError(f"unknown link {link!r}")
+
+
+def _numeric_elasticity(a, beta, log_price, link, d, h=1e-4):
+    """``-d log s / d log p`` by central difference — identical treatment for every link."""
+    lp = np.asarray(log_price, float)
+    up = _apply_link(a - beta * (lp + h), link, d)
+    dn = _apply_link(a - beta * (lp - h), link, d)
+    return -(np.log(np.maximum(up, 1e-300)) - np.log(np.maximum(dn, 1e-300))) / (2 * h)
 
 
 def make_quote_panel(cfg: MotorQuoteConfig | None = None) -> pd.DataFrame:
@@ -182,8 +229,9 @@ def make_quote_panel(cfg: MotorQuoteConfig | None = None) -> pd.DataFrame:
     target = np.log(cfg.base_conversion / (1 - cfg.base_conversion))
     a = a_raw - a_raw.mean() + target + beta * log_tech          # so eta is O(1) at mult=1
     d["_a"] = a
+    d["_link"] = cfg.link
     eta = a - beta * d["log_price"].to_numpy()
-    s = 1.0 / (1.0 + np.exp(-eta))
+    s = _apply_link(eta, cfg.link, d)
     d["true_s"] = s
     d["converted"] = (rng.random(n) < s).astype(int)
     #: the estimand AT THE PRICE ACTUALLY QUOTED.  It depends on the arm through s -- the
@@ -196,9 +244,13 @@ def make_quote_panel(cfg: MotorQuoteConfig | None = None) -> pd.DataFrame:
     #: elasticity then comes out badly biased (measured: 0.31 against a true 0.52 in the
     #: least-elastic bin).  The trap is not specific to the simulator: any model whose
     #: `elasticity()` is evaluated at the price the customer happened to be quoted has it.
-    s_ctrl = 1.0 / (1.0 + np.exp(-(a - beta * log_tech)))
-    d["true_s_control"] = s_ctrl
-    d["true_elasticity_control"] = beta * (1.0 - s_ctrl)
+    # The elasticity is -d log s / d log p, which for a general link is
+    # (dS/deta)(-beta)/S -- computed numerically so every link is handled identically and
+    # the closed-form logit case is not silently special-cased.
+    d["true_s_control"] = _apply_link(a - beta * log_tech, cfg.link, d)
+    d["true_elasticity_control"] = _numeric_elasticity(a, beta, log_tech, cfg.link, d)
+    d["true_elasticity"] = _numeric_elasticity(
+        a, beta, d["log_price"].to_numpy(float), cfg.link, d)
 
     # ---- economics -------------------------------------------------------------------------
     d["claims_cost"] = np.exp(log_tech) * cfg.loss_ratio * np.exp(
@@ -222,7 +274,9 @@ def true_conversion_matrix(d: pd.DataFrame) -> np.ndarray:
     a = d["_a"].to_numpy()[:, None]
     beta = d["true_beta"].to_numpy()[:, None]
     logp = d["log_technical_premium"].to_numpy()[:, None] + np.log(mult)[None, :]
-    return 1.0 / (1.0 + np.exp(-(a - beta * logp)))
+    link = d["_link"].iloc[0] if "_link" in d else "logit"
+    return np.column_stack([_apply_link(a[:, 0] - beta[:, 0] * logp[:, k], link, d)
+                            for k in range(logp.shape[1])])
 
 
 # =======================================================================================
@@ -866,8 +920,10 @@ def profit_regret(d: pd.DataFrame, eps_hat: np.ndarray, *, price0=None,
     p0 = np.exp(d["log_technical_premium"].to_numpy(float)) if price0 is None \
         else np.asarray(price0, float)
 
+    link = d["_link"].iloc[0] if "_link" in d else "logit"
+
     def true_profit(p):
-        s = 1.0 / (1.0 + np.exp(-(a - beta * np.log(p))))
+        s = _apply_link(a - beta * np.log(p), link, d)
         return s * (p - c)
 
     eps_true = d["true_elasticity_control"].to_numpy(float)
@@ -909,3 +965,395 @@ def experiment_cost(d: pd.DataFrame, *, reference: str = "control") -> dict:
             "realised_profit": realised,
             "cost_per_quote": float(ref - realised),
             "cost_pct": float((ref - realised) / max(abs(ref), 1e-9))}
+
+
+# =======================================================================================
+# Phase A: the treatment feature, the logit-space derivative, competitive position
+# =======================================================================================
+#: Features plus the two engineered terms of ``PLAN_INSURANCE_V2`` I1 and I4.
+#:
+#: ``arm_log_multiplier`` is **the treatment, isolated**.  Feeding a tree ``log_price``
+#: instead is the mistake that cost the flexible models the benchmark: ``log_price =
+#: log_technical_premium + arm_log_multiplier`` and the first term is *also* a feature, so
+#: a split on ``log_price`` mixes "expensive customer" (a factor of ten across the book)
+#: with "dear arm" (+/-10%).  A linear model separates them exactly; a tree cannot.
+#:
+#: ``price_vs_market`` is ``log_price - log_competitor_index`` — competitive position.  The
+#: DGP drives conversion through exactly this difference, and in real motor pricing it is
+#: the strongest conversion feature there is.  Both components were already available and
+#: neither model was given the difference, which a tree needs many splits to approximate.
+ENGINEERED = ["arm_log_multiplier", "price_vs_market"]
+
+
+def add_engineered(d: pd.DataFrame, log_price=None) -> pd.DataFrame:
+    """Attach the engineered treatment features, optionally at a counterfactual price."""
+    out = d.copy()
+    lp = out["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+    out["arm_log_multiplier"] = lp - out["log_technical_premium"].to_numpy(float)
+    out["price_vs_market"] = lp - out["log_competitor_index"].to_numpy(float)
+    return out
+
+
+def _design_v2(d, log_price, cols):
+    lp = np.asarray(log_price, float)
+    tech = d["log_technical_premium"].to_numpy(float)
+    comp = d["log_competitor_index"].to_numpy(float)
+    parts = []
+    for c in cols:
+        if c == "arm_log_multiplier":
+            parts.append(lp - tech)
+        elif c == "price_vs_market":
+            parts.append(lp - comp)
+        elif c == "log_price":
+            parts.append(lp)
+        else:
+            parts.append(d[c].to_numpy(float))
+    return np.column_stack(parts)
+
+
+class ConversionGBMv2(ConversionModel):
+    """The boosted conversion model, with I1–I4 applied.
+
+    Four changes from :class:`ConversionGBM`, each addressing a diagnosed defect rather
+    than a hyperparameter:
+
+    **I1** the treatment enters as ``arm_log_multiplier``, isolated from customer identity.
+    **I4** ``price_vs_market`` gives the model competitive position as one feature.
+    **I2** ``monotone`` puts a non-increasing constraint on both price columns, so
+    ``eps >= 0`` holds by construction.  Published cost of monotonicity in GBM credit
+    models is 0–2.9% of accuracy; here it is measured rather than assumed.
+    **I3** the derivative is taken in **logit space**:
+    ``eps = -(d eta / d log p) * (1 - s)``.  The model is additive in ``eta``, so this is
+    where a finite difference is stable, and it makes the bounded-demand structure of
+    ``INSURANCE.md`` §1.2 explicit instead of hoping the probability scale reproduces it.
+    """
+
+    name = "conversion_gbm_v2"
+
+    def __init__(self, n_estimators: int = 400, learning_rate: float = 0.05,
+                 num_leaves: int = 31, min_child_samples: int = 100,
+                 reg_lambda: float = 1.0, subsample: float = 1.0,
+                 colsample_bytree: float = 1.0, delta: float = 0.10,
+                 monotone: bool = True, use_price_level: bool = False, seed: int = 0):
+        super().__init__(n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         reg_lambda=reg_lambda, subsample=subsample,
+                         colsample_bytree=colsample_bytree, delta=delta,
+                         monotone=monotone, use_price_level=use_price_level, seed=seed)
+
+    def _cols(self):
+        cols = list(QUOTE_FEATURES) + list(ENGINEERED)
+        if self.params["use_price_level"]:
+            cols = cols + ["log_price"]
+        return cols
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.cols_ = self._cols()
+        p = {k: v for k, v in self.params.items()
+             if k in ("n_estimators", "learning_rate", "num_leaves",
+                      "min_child_samples", "reg_lambda", "colsample_bytree")}
+        if self.params["subsample"] < 1.0:
+            p["subsample"] = self.params["subsample"]
+            p["subsample_freq"] = 1
+        if self.params["monotone"]:
+            # -1 = non-increasing.  Conversion cannot rise with the price charged, nor
+            # with the price relative to the market.
+            p["monotone_constraints"] = [
+                -1 if c in ("arm_log_multiplier", "price_vs_market", "log_price") else 0
+                for c in self.cols_]
+        self.m_ = lgb.LGBMClassifier(objective="binary", verbosity=-1, n_jobs=N_THREADS,
+                                     random_state=self.params["seed"],
+                                     force_col_wise=True, **p)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.m_.fit(_design_v2(d, d["log_price"].to_numpy(float), self.cols_),
+                        d["converted"].to_numpy(int))
+        return self
+
+    def _eta(self, d, log_price):
+        return self.m_.predict(_design_v2(d, log_price, self.cols_), raw_score=True)
+
+    def conversion(self, d, log_price=None):
+        lp = d["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+        return 1.0 / (1.0 + np.exp(-self._eta(d, lp)))
+
+    def elasticity(self, d, at="control"):
+        lp = self._log_price(d, at)
+        h = self.params["delta"]
+        # I3: differentiate the LOGIT, then convert.  eps = -(d eta / d log p)(1 - s).
+        deta = (self._eta(d, lp + h) - self._eta(d, lp - h)) / (2 * h)
+        s = 1.0 / (1.0 + np.exp(-self._eta(d, lp)))
+        return -deta * (1.0 - s)
+
+
+class ConversionGLMv2(ConversionModel):
+    """The **fair** parametric baseline: a logit with price interactions and splines (I11).
+
+    "A GBM beats a GLM" is only interesting if the GLM was allowed to express what the GBM
+    discovers.  The actuarial literature's recommended specification is a logit in log price
+    with interactions against the main rating factors and splines on the continuous ones —
+    not a plain main-effects model.  This is that.
+
+    ``interact_with`` names the features whose interaction with the treatment is fitted, so
+    the elasticity varies with them:
+
+        eta = a'x + spline(x)  -  (beta_0 + sum_j beta_j z_j) * log p
+
+    and therefore ``eps = (beta_0 + sum_j beta_j z_j)(1 - s)`` — still closed form, still
+    guaranteed non-negative when the coefficients are, but now heterogeneous in a way the
+    main-effects GLM could not represent.
+    """
+
+    name = "conversion_glm_v2"
+
+    def __init__(self, C: float = 1.0, n_knots: int = 5,
+                 interact_with=("shopping_intensity", "channel_aggregator",
+                                "is_renewal", "log_competitor_index", "driver_age")):
+        super().__init__(C=C, n_knots=n_knots, interact_with=tuple(interact_with))
+
+    def _blocks(self, d, lp):
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        Z = np.column_stack([d[c].to_numpy(float) for c in self.params["interact_with"]])
+        Zs = (Z - self.zmu_) / self.zsd_
+        spl = self.spline_.transform(d[self.spline_cols_].to_numpy(float))
+        # treatment block: log p, and log p interacted with each standardised z
+        t = np.column_stack([lp] + [lp * Zs[:, j] for j in range(Zs.shape[1])])
+        return np.column_stack([X, spl, t]), t.shape[1]
+
+    def fit(self, d):
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import SplineTransformer
+
+        self.spline_cols_ = ["driver_age", "log_technical_premium",
+                             "log_competitor_index", "shopping_intensity"]
+        self.spline_ = SplineTransformer(n_knots=self.params["n_knots"], degree=3,
+                                         include_bias=False)
+        self.spline_.fit(d[self.spline_cols_].to_numpy(float))
+        Z = np.column_stack([d[c].to_numpy(float)
+                             for c in self.params["interact_with"]])
+        self.zmu_, self.zsd_ = Z.mean(0), np.where(Z.std(0) > 1e-12, Z.std(0), 1.0)
+
+        lp = d["log_price"].to_numpy(float)
+        A, n_t = self._blocks(d, lp)
+        self.n_t_ = n_t
+        self.mu_, self.sd_ = A.mean(0), np.where(A.std(0) > 1e-12, A.std(0), 1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.m_ = LogisticRegression(C=self.params["C"], max_iter=3000).fit(
+                (A - self.mu_) / self.sd_, d["converted"].to_numpy(int))
+        self.coef_ = self.m_.coef_[0] / self.sd_
+        return self
+
+    def _beta(self, d):
+        """The customer-specific price coefficient, ``beta_0 + sum_j beta_j z_j``."""
+        Z = np.column_stack([d[c].to_numpy(float)
+                             for c in self.params["interact_with"]])
+        Zs = (Z - self.zmu_) / self.zsd_
+        c = self.coef_[-self.n_t_:]
+        return -(c[0] + Zs @ c[1:])
+
+    def conversion(self, d, log_price=None):
+        lp = d["log_price"].to_numpy(float) if log_price is None else np.asarray(log_price)
+        A, _ = self._blocks(d, lp)
+        return self.m_.predict_proba((A - self.mu_) / self.sd_)[:, 1]
+
+    def elasticity(self, d, at="control"):
+        lp = self._log_price(d, at)
+        return self._beta(d) * (1.0 - self.conversion(d, lp))
+
+
+class AIPWArmEffects(ConversionModel):
+    """Doubly-robust per-arm conversion, then the elasticity from the fitted curve (I6).
+
+    The propensity is **known exactly** — this is a randomised test — so the augmented
+    estimator
+
+        mu_k(x)  =  m_k(x)  +  1[A = k] / pi_k  *  ( Y - m_k(x) )
+
+    is unbiased for ``s_k(x)`` whatever the outcome model ``m_k`` does, and has strictly
+    lower variance than plain inverse-propensity weighting because the ``m_k`` term absorbs
+    the predictable part of ``Y``.  With 0.1/0.8/0.1 that variance reduction is the whole
+    game: the naive IPW estimate of a side arm rests on a tenth of the traffic.
+
+    Implemented in two stages: cross-fitted outcome models ``m_k`` (so a quote's own
+    residual never enters its own fitted value), then a **second-stage regression of the
+    AIPW pseudo-outcome on the covariates**, which turns the unbiased-but-noisy pointwise
+    scores into a smooth per-arm curve.
+
+    Doubly robust and, here, robust for free: the propensity leg cannot be wrong.
+    """
+
+    name = "aipw_arm_effects"
+
+    def __init__(self, n_folds: int = 4, n_estimators: int = 300,
+                 learning_rate: float = 0.05, num_leaves: int = 31,
+                 min_child_samples: int = 100, final_num_leaves: int = 15,
+                 final_n_estimators: int = 200, monotone: bool = True, seed: int = 0):
+        super().__init__(n_folds=n_folds, n_estimators=n_estimators,
+                         learning_rate=learning_rate, num_leaves=num_leaves,
+                         min_child_samples=min_child_samples,
+                         final_num_leaves=final_num_leaves,
+                         final_n_estimators=final_n_estimators,
+                         monotone=monotone, seed=seed)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.mult_ = np.asarray(d.attrs["arm_multipliers"], float)
+        pi = np.asarray(d.attrs["arm_probs"], float)
+        self.pi_ = pi / pi.sum()
+        K = len(self.mult_)
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        y = d["converted"].to_numpy(float)
+        arm = d["arm"].to_numpy()
+        n = len(d)
+
+        rng = np.random.default_rng(self.params["seed"])
+        fold = rng.integers(0, self.params["n_folds"], n)
+        m_hat = np.zeros((n, K))
+        base = {k: v for k, v in self.params.items()
+                if k in ("n_estimators", "learning_rate", "num_leaves",
+                         "min_child_samples")}
+        for f in range(self.params["n_folds"]):
+            tr, te = fold != f, fold == f
+            for k in range(K):
+                sel = tr & (arm == k)
+                if sel.sum() < 50:
+                    m_hat[te, k] = y[tr].mean()
+                    continue
+                mk = lgb.LGBMClassifier(objective="binary", verbosity=-1,
+                                        n_jobs=N_THREADS, force_col_wise=True,
+                                        random_state=self.params["seed"], **base)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    mk.fit(X[sel], y[sel].astype(int))
+                m_hat[te, k] = mk.predict_proba(X[te])[:, 1]
+
+        # the AIPW pseudo-outcome, one column per arm
+        psi = m_hat.copy()
+        for k in range(K):
+            hit = arm == k
+            psi[hit, k] += (y[hit] - m_hat[hit, k]) / self.pi_[k]
+
+        # second stage: smooth each arm's pseudo-outcome back onto the covariates
+        self.final_ = []
+        fp = dict(n_estimators=self.params["final_n_estimators"],
+                  learning_rate=self.params["learning_rate"],
+                  num_leaves=self.params["final_num_leaves"],
+                  min_child_samples=self.params["min_child_samples"])
+        for k in range(K):
+            g = lgb.LGBMRegressor(objective="regression", verbosity=-1, n_jobs=N_THREADS,
+                                  force_col_wise=True, random_state=self.params["seed"],
+                                  **fp)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                g.fit(X, psi[:, k])
+            self.final_.append(g)
+        self.ipw_only_ = psi           # kept so the variance gain can be measured
+        return self
+
+    def _curve(self, d):
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        s = np.column_stack([g.predict(X) for g in self.final_])
+        s = np.clip(s, 1e-4, 1 - 1e-4)
+        if self.params["monotone"]:
+            s = np.exp(isotonic_decreasing(np.log(s)))
+        return s
+
+    def conversion(self, d, log_price=None):
+        return self._curve(d)[np.arange(len(d)), d["arm"].to_numpy()]
+
+    def elasticity(self, d, at="control"):
+        s = self._curve(d)
+        x = np.log(self.mult_) - np.log(self.mult_).mean()
+        return -(np.log(s) * x[None, :]).sum(1) / np.sum(x ** 2)
+
+
+class AnchoredTLearner(ConversionModel):
+    """A T-learner that does not throw away the control arm (I7).
+
+    The plain T-learner fits three independent models, so each side arm is estimated from a
+    tenth of the traffic.  This one fits the **control** arm on its 80% — where the data
+    is — and then models only the *increment* ``eta_k - eta_control`` for the side arms,
+    with the control fit supplied as an ``init_score`` offset.  The side-arm models
+    therefore start from a good answer and only have to learn a small correction, which is
+    the same construction as :class:`GLMThenGBM` applied across arms rather than across
+    model classes.
+    """
+
+    name = "anchored_tlearner"
+
+    def __init__(self, n_estimators: int = 300, learning_rate: float = 0.05,
+                 num_leaves: int = 31, min_child_samples: int = 100,
+                 side_n_estimators: int = 150, side_num_leaves: int = 8,
+                 side_learning_rate: float = 0.03, monotone: bool = True, seed: int = 0):
+        super().__init__(n_estimators=n_estimators, learning_rate=learning_rate,
+                         num_leaves=num_leaves, min_child_samples=min_child_samples,
+                         side_n_estimators=side_n_estimators,
+                         side_num_leaves=side_num_leaves,
+                         side_learning_rate=side_learning_rate,
+                         monotone=monotone, seed=seed)
+
+    def fit(self, d):
+        import lightgbm as lgb
+        self.mult_ = np.asarray(d.attrs["arm_multipliers"], float)
+        K = len(self.mult_)
+        self.control_ = K // 2
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        y = d["converted"].to_numpy(int)
+        arm = d["arm"].to_numpy()
+
+        base = lgb.LGBMClassifier(
+            objective="binary", verbosity=-1, n_jobs=N_THREADS, force_col_wise=True,
+            random_state=self.params["seed"],
+            **{k: self.params[k] for k in ("n_estimators", "learning_rate",
+                                           "num_leaves", "min_child_samples")})
+        sel = arm == self.control_
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            base.fit(X[sel], y[sel])
+        self.base_ = base
+
+        self.side_ = {}
+        for k in range(K):
+            if k == self.control_:
+                continue
+            s = arm == k
+            init = base.predict(X[s], raw_score=True)
+            g = lgb.LGBMClassifier(
+                objective="binary", verbosity=-1, n_jobs=N_THREADS, force_col_wise=True,
+                random_state=self.params["seed"],
+                n_estimators=self.params["side_n_estimators"],
+                num_leaves=self.params["side_num_leaves"],
+                learning_rate=self.params["side_learning_rate"],
+                min_child_samples=self.params["min_child_samples"])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                g.fit(X[s], y[s], init_score=init)
+            self.side_[k] = g
+        return self
+
+    def _curve(self, d):
+        X = d[QUOTE_FEATURES].to_numpy(float)
+        eta0 = self.base_.predict(X, raw_score=True)
+        etas = []
+        for k in range(len(self.mult_)):
+            e = eta0 if k == self.control_ else eta0 + self.side_[k].predict(
+                X, raw_score=True)
+            etas.append(e)
+        s = 1.0 / (1.0 + np.exp(-np.column_stack(etas)))
+        if self.params["monotone"]:
+            s = np.exp(isotonic_decreasing(np.log(np.clip(s, 1e-6, 1 - 1e-6))))
+        return s
+
+    def conversion(self, d, log_price=None):
+        return self._curve(d)[np.arange(len(d)), d["arm"].to_numpy()]
+
+    def elasticity(self, d, at="control"):
+        s = self._curve(d)
+        x = np.log(self.mult_) - np.log(self.mult_).mean()
+        return -(np.log(s) * x[None, :]).sum(1) / np.sum(x ** 2)
+
+
+MOTOR_MODELS_V2 = {m.name: m for m in (ConversionGLMv2, ConversionGBMv2,
+                                       AIPWArmEffects, AnchoredTLearner)}

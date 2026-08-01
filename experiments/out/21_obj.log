@@ -1,0 +1,60 @@
+
+### link = logit
+   gbm (v1)             select on logloss      -> regret  18.762  eps_rmse  2.408  [  32s]
+   gbm (v1)             select on ipw_policy   -> regret  18.762  eps_rmse  2.408  [  32s]
+   gbm (v1)             select on aipw_policy  -> regret  11.804  eps_rmse  1.431  [  32s]
+   gbm (v1)             select on regret       -> regret   8.090  eps_rmse  1.145  [  31s]
+   gbm (v2)             select on logloss      -> regret   8.463  eps_rmse  1.375  [  30s]
+   gbm (v2)             select on ipw_policy   -> regret  15.220  eps_rmse  2.372  [  30s]
+   gbm (v2)             select on aipw_policy  -> regret  15.220  eps_rmse  2.372  [  31s]
+   gbm (v2)             select on regret       -> regret   8.026  eps_rmse  1.291  [  31s]
+   tlearner (anchored)  select on logloss      -> regret   5.253  eps_rmse  0.735  [  15s]
+   tlearner (anchored)  select on ipw_policy   -> regret  11.974  eps_rmse  1.763  [  16s]
+   tlearner (anchored)  select on aipw_policy  -> regret  10.534  eps_rmse  1.552  [  16s]
+   tlearner (anchored)  select on regret       -> regret   4.559  eps_rmse  0.837  [  15s]
+
+### link = kinked
+   gbm (v1)             select on logloss      -> regret   8.283  eps_rmse  0.991  [  32s]
+   gbm (v1)             select on ipw_policy   -> regret  11.046  eps_rmse  0.870  [  34s]
+   gbm (v1)             select on aipw_policy  -> regret  11.046  eps_rmse  0.870  [  34s]
+   gbm (v1)             select on regret       -> regret   3.638  eps_rmse  0.602  [  31s]
+   gbm (v2)             select on logloss      -> regret  15.163  eps_rmse  0.724  [  30s]
+   gbm (v2)             select on ipw_policy   -> regret  27.305  eps_rmse  0.987  [  33s]
+   gbm (v2)             select on aipw_policy  -> regret  38.108  eps_rmse  1.591  [  33s]
+   gbm (v2)             select on regret       -> regret  15.163  eps_rmse  0.724  [  31s]
+   tlearner (anchored)  select on logloss      -> regret   0.921  eps_rmse  0.538  [  15s]
+   tlearner (anchored)  select on ipw_policy   -> regret   0.214  eps_rmse  0.423  [  17s]
+   tlearner (anchored)  select on aipw_policy  -> regret   0.214  eps_rmse  0.423  [  16s]
+   tlearner (anchored)  select on regret       -> regret   0.143  eps_rmse  0.545  [  15s]
+
+================================================================================================================
+PROFIT REGRET BY SELECTION OBJECTIVE  (lower is better; 'regret' is the oracle bound)
+================================================================================================================
+
+--- logit ---
+select_on            untuned  logloss  ipw_policy  aipw_policy  regret
+model                                                                 
+gbm (v1)               9.464   18.762      18.762       11.804   8.090
+gbm (v2)               8.873    8.463      15.220       15.220   8.026
+tlearner (anchored)    6.985    5.253      11.974       10.534   4.559
+
+--- kinked ---
+select_on            untuned  logloss  ipw_policy  aipw_policy  regret
+model                                                                 
+gbm (v1)               3.212    8.283      11.046       11.046   3.638
+gbm (v2)              33.885   15.163      27.305       38.108  15.163
+tlearner (anchored)    6.192    0.921       0.214        0.214   0.143
+
+================================================================================================================
+HOW MUCH OF THE ORACLE HEADROOM DOES EACH OBSERVABLE OBJECTIVE RECOVER?
+================================================================================================================
+link         kinked    logit
+objective                   
+aipw_policy 638.746 -355.320
+ipw_policy  657.979 -543.854
+logloss     459.418 -185.582
+
+  100% would mean the observable objective found what the oracle found.  Negative means
+  tuning on it made the model WORSE than not tuning at all.
+
+wrote experiments/out/21_observable_objective.csv

@@ -1,0 +1,122 @@
+======================================================================================================================
+TUNED COMPARISON ACROSS FOUR DEMAND SHAPES   (n=150,000, 10 trials/model)
+======================================================================================================================
+
+### link = logit   conversion 0.3716   true eps +2.122 (sd 1.229)
+  glm (v1)                 untuned regret   6.444  ->  tuned-on-logloss   6.357  (oracle bound   6.357)   [    8s]
+  glm+interactions (v2)    untuned regret   8.719  ->  tuned-on-logloss   8.492  (oracle bound   7.521)   [   32s]
+  gbm (v1)                 untuned regret   9.950  ->  tuned-on-logloss  16.925  (oracle bound   8.591)   [   77s]
+  gbm (v2: I1+I2+I3+I4)    untuned regret   9.263  ->  tuned-on-logloss  14.227  (oracle bound   3.037)   [   74s]
+  tlearner (v1)            untuned regret  12.039  ->  tuned-on-logloss  16.328  (oracle bound   7.900)   [   40s]
+  tlearner (anchored)      untuned regret   6.639  ->  tuned-on-logloss   8.096  (oracle bound   3.559)   [   41s]
+  aipw arm effects         untuned regret  12.749  ->  tuned-on-logloss  12.531  (oracle bound   9.622)   [  131s]
+
+### link = probit   conversion 0.3723   true eps +2.297 (sd 1.595)
+  glm (v1)                 untuned regret   6.355  ->  tuned-on-logloss   6.243  (oracle bound   6.243)   [    9s]
+  glm+interactions (v2)    untuned regret   8.745  ->  tuned-on-logloss   8.205  (oracle bound   7.614)   [   33s]
+  gbm (v1)                 untuned regret  10.078  ->  tuned-on-logloss  18.727  (oracle bound   8.998)   [   70s]
+  gbm (v2: I1+I2+I3+I4)    untuned regret   8.165  ->  tuned-on-logloss  15.025  (oracle bound   2.063)   [   69s]
+  tlearner (v1)            untuned regret  12.728  ->  tuned-on-logloss  16.840  (oracle bound   7.712)   [   38s]
+  tlearner (anchored)      untuned regret   6.746  ->  tuned-on-logloss   8.076  (oracle bound   3.349)   [   38s]
+  aipw arm effects         untuned regret  13.447  ->  tuned-on-logloss  13.205  (oracle bound  10.836)   [  119s]
+
+### link = kinked   conversion 0.4542   true eps +0.967 (sd 0.423)
+  glm (v1)                 untuned regret   0.121  ->  tuned-on-logloss   0.119  (oracle bound   0.119)   [    7s]
+  glm+interactions (v2)    untuned regret   0.116  ->  tuned-on-logloss  16.194  (oracle bound   0.400)   [   67s]
+  gbm (v1)                 untuned regret   2.013  ->  tuned-on-logloss   6.978  (oracle bound   1.857)   [   73s]
+  gbm (v2: I1+I2+I3+I4)    untuned regret  20.145  ->  tuned-on-logloss   0.897  (oracle bound   0.897)   [   72s]
+  tlearner (v1)            untuned regret  17.591  ->  tuned-on-logloss   9.325  (oracle bound   0.919)   [   38s]
+  tlearner (anchored)      untuned regret   6.369  ->  tuned-on-logloss   9.648  (oracle bound   0.209)   [   40s]
+  aipw arm effects         untuned regret  18.117  ->  tuned-on-logloss  16.958  (oracle bound   2.039)   [  123s]
+
+### link = mixed   conversion 0.3620   true eps +2.325 (sd 1.636)
+  glm (v1)                 untuned regret   8.414  ->  tuned-on-logloss   8.528  (oracle bound   8.333)   [    8s]
+  glm+interactions (v2)    untuned regret  10.457  ->  tuned-on-logloss  10.013  (oracle bound   9.365)   [   35s]
+  gbm (v1)                 untuned regret   9.200  ->  tuned-on-logloss  17.895  (oracle bound   7.781)   [   71s]
+  gbm (v2: I1+I2+I3+I4)    untuned regret  10.937  ->  tuned-on-logloss  10.745  (oracle bound   3.708)   [   71s]
+  tlearner (v1)            untuned regret  11.094  ->  tuned-on-logloss  16.231  (oracle bound   4.809)   [   38s]
+  tlearner (anchored)      untuned regret   5.509  ->  tuned-on-logloss   6.928  (oracle bound   3.185)   [   40s]
+  aipw arm effects         untuned regret  11.862  ->  tuned-on-logloss  11.796  (oracle bound   7.123)   [  126s]
+
+======================================================================================================================
+ELASTICITY RMSE, TUNED, BY DEMAND SHAPE  (lower is better; the GLM is only
+correctly specified under 'logit')
+======================================================================================================================
+link                   kinked  logit  mixed  probit
+model                                              
+aipw arm effects        1.847  5.495  6.060   5.640
+gbm (v1)                0.936  2.383  2.575   2.600
+gbm (v2: I1+I2+I3+I4)   0.991  1.840  1.880   2.085
+glm (v1)                0.377  0.841  1.352   1.244
+glm+interactions (v2)   0.756  0.864  1.333   1.231
+tlearner (anchored)     0.870  1.286  1.292   1.395
+tlearner (v1)           1.096  2.842  2.902   2.930
+
+PROFIT REGRET, TUNED
+link                   kinked  logit  mixed  probit
+model                                              
+aipw arm effects       16.958 12.531 11.796  13.205
+gbm (v1)                6.978 16.925 17.895  18.727
+gbm (v2: I1+I2+I3+I4)   0.897 14.227 10.745  15.025
+glm (v1)                0.119  6.357  8.528   6.243
+glm+interactions (v2)  16.194  8.492 10.013   8.205
+tlearner (anchored)     9.648  8.096  6.928   8.076
+tlearner (v1)           9.325 16.328 16.231  16.840
+
+RANK CORRELATION WITH THE TRUTH, TUNED
+link                   kinked  logit  mixed  probit
+model                                              
+aipw arm effects        0.212  0.300  0.349   0.334
+gbm (v1)                0.135  0.235  0.196   0.145
+gbm (v2: I1+I2+I3+I4)   0.446  0.548  0.663   0.552
+glm (v1)                0.516  0.834  0.768   0.811
+glm+interactions (v2)   0.242  0.812  0.743   0.791
+tlearner (anchored)     0.344  0.627  0.730   0.636
+tlearner (v1)           0.242  0.380  0.457   0.396
+
+NEGATIVE-ELASTICITY RATE, TUNED
+link                   kinked  logit  mixed  probit
+model                                              
+aipw arm effects        0.263  0.211  0.217   0.207
+gbm (v1)                0.042  0.065  0.033   0.026
+gbm (v2: I1+I2+I3+I4)   0.372  0.319  0.314   0.331
+glm (v1)                0.000  0.000  0.000   0.000
+glm+interactions (v2)   0.079  0.000  0.000   0.000
+tlearner (anchored)     0.000  0.000  0.000   0.000
+tlearner (v1)           0.200  0.234  0.232   0.230
+
+======================================================================================================================
+WHAT TUNING BOUGHT  (untuned regret - tuned regret; positive = tuning helped)
+======================================================================================================================
+                       logit  probit  kinked  mixed
+model                                              
+aipw arm effects       0.219   0.242   1.159  0.066
+gbm (v1)              -6.975  -8.648  -4.965 -8.694
+gbm (v2: I1+I2+I3+I4) -4.964  -6.860  19.248  0.192
+glm (v1)               0.087   0.112   0.002 -0.113
+glm+interactions (v2)  0.227   0.541 -16.078  0.445
+tlearner (anchored)   -1.457  -1.330  -3.279 -1.419
+tlearner (v1)         -4.289  -4.112   8.266 -5.136
+
+AND WHAT AN ORACLE OBJECTIVE WOULD HAVE BOUGHT  (untuned - oracle-tuned)
+                       logit  probit  kinked  mixed
+model                                              
+aipw arm effects       3.128   2.611  16.077  4.739
+gbm (v1)               1.359   1.080   0.156  1.420
+gbm (v2: I1+I2+I3+I4)  6.227   6.102  19.248  7.229
+glm (v1)               0.087   0.112   0.002  0.082
+glm+interactions (v2)  1.198   1.132  -0.284  1.092
+tlearner (anchored)    3.080   3.398   6.160  2.324
+tlearner (v1)          4.139   5.016  16.672  6.285
+
+The gap between the two tables is what selecting on an observable objective costs.
+
+======================================================================================================================
+WINNER BY DEMAND SHAPE
+======================================================================================================================
+  logit    best eps_rmse: glm (v1)                  best regret: glm (v1)                  best profit: tlearner (anchored)
+  probit   best eps_rmse: glm+interactions (v2)     best regret: glm (v1)                  best profit: glm+interactions (v2)
+  kinked   best eps_rmse: glm (v1)                  best regret: glm (v1)                  best profit: gbm (v2: I1+I2+I3+I4)
+  mixed    best eps_rmse: tlearner (anchored)       best regret: tlearner (anchored)       best profit: glm+interactions (v2)
+
+wrote experiments/out/20_insurance_v2.csv and 20_best_params.json
