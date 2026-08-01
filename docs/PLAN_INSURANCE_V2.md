@@ -174,7 +174,26 @@ Prediction 6 is the one I most expect to be wrong, and it is the most useful eit
 
 ---
 
-## 3. Results, and four predictions that failed
+## 3. RETRACTED — results, and four predictions that failed
+
+> **This section is withdrawn as evidence about model quality.** Every comparison below is
+> run on simulated data, so it reports which model matches my generator. The GLM's wins in
+> §3.3 in particular are an artefact: the simulator draws a logit and the GLM fits a logit.
+>
+> Two things in here are not model rankings and do survive:
+>
+> * **§3.1 / §3.2** — that tuning on a predictive objective moved profit regret in the
+>   *wrong direction* while an oracle objective moved it a long way in the right one. This
+>   is a statement about the relationship between two loss functions on the same fitted
+>   models, and the same finding was established independently on **real data** in the
+>   retail study (`ELASTICITY_MODELS.md` §4.4). The simulation adds a second instance, not
+>   the evidence.
+> * **The `monotone` finding in §3.3** — that offering a law-of-demand constraint as a
+>   tunable, under a predictive objective, causes the search to switch it off. That is a
+>   property of the search procedure and holds whatever the data.
+>
+> Everything else — which model wins under which link, the interaction results, the
+> ε-RMSE table — is withdrawn.
 
 `experiments/20_insurance_v2.py` (150,000 quotes, 10 trials/model/objective, four demand
 shapes) and `experiments/21_observable_objective.py`.

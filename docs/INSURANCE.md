@@ -18,9 +18,39 @@ rather than just the data. Notation extends [`MODELS.md §0`](MODELS.md#0-notati
 > conversion outcomes but **no randomised price arms**. A price test's allocation and its
 > measured elasticity are exactly what an insurer would not publish.
 >
-> So: the *structure* of the problem in §1 is derived and should hold generally; the
-> *numbers* in §2–§6 are properties of a simulator. **§7 measures how much depends on the
-> allocation being right, and the answer is: for one model family, a great deal.**
+> ### RETRACTION — the model comparisons in §4, §5 and §6 are withdrawn
+>
+> Ranking models on data I generated measures **which model matches my generator**, not
+> which model is better. The simulator draws conversion from a logit and `ConversionGLM`
+> fits a logit, so its win was an identity, not a result. Adding probit and "kinked" links
+> did not repair this: both are single-index curves close to a logit, so the GLM remained
+> near-correctly-specified and won three of four — which is the same tautology with more
+> compute behind it.
+>
+> **Withdrawn:** every table ranking models (§4), the profit comparison between models
+> (§5), the arm-width model comparison (§6.2), and the claim in §6.5 that squared error and
+> profit regret agree about model choice. None of those is evidence about anything outside
+> `MotorQuoteConfig`.
+>
+> **What survives, and why.** Simulation validates *procedures* and quantifies
+> *sensitivities*; it cannot rank models. These are the second kind:
+>
+> * **§1** — algebra, not simulation. That $\varepsilon = \beta(1-s)$ for bounded demand,
+>   and that $b_k \propto \pi_k s_k$ is non-monotone at 0.1/0.8/0.1, are derivations. The
+>   simulator only illustrates them.
+> * **§2.1** — the reference-price trap. A statement about what happens when you bin on a
+>   treatment-dependent quantity; true of any estimator, shown with a case where the truth
+>   is knowable.
+> * **§3** — the constraint triangle and the gauge map. Verified to `0.00e+00`, which is a
+>   check that the code implements the maths.
+> * **§7** — the π-sensitivity. The bias is a **closed-form consequence of the estimator's
+>   algebra**, predicted to `0.0000` and independent of what the demand curve looks like.
+> * **§6.3** — detectability, *read strictly as a power calculation* conditional on the
+>   assumed effect sizes, as any power calculation is.
+>
+> The retail work in [`ELASTICITY_MODELS.md`](ELASTICITY_MODELS.md) does not have this
+> problem: its rankings are on the real UCI panel, and its simulator is used only to grade
+> *estimators against a known truth*, never to decide which model is better in the world.
 
 ---
 
