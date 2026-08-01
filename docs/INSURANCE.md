@@ -3,6 +3,25 @@
 A different problem from the retail panel, and different in ways that change the models
 rather than just the data. Notation extends [`MODELS.md §0`](MODELS.md#0-notation).
 
+> ## ⚠ Provenance: this section has no real data behind it
+>
+> **Every insurance number in this repository comes from a simulator I wrote**
+> (`elasticity_lab.insurance.make_quote_panel`). Unlike the retail work, which is built on
+> the real UCI Online Retail II panel, there is **no real motor dataset here at all**. The
+> parameters — 33% conversion, a 0.68 loss ratio, a mean logit slope of 3.2 — are my guesses
+> at plausible values, calibrated against nothing.
+>
+> **The 0.1 / 0.8 / 0.1 allocation came from the user's description of a live test.** It was
+> hard-coded as a default and never independently verified. A search for public data turned
+> up the price-test *structure* (−a% / 0% / +a% randomised loadings) as standard industry
+> practice, and the closest public dataset — Homesite Quote Conversion, 67,504 quotes — has
+> conversion outcomes but **no randomised price arms**. A price test's allocation and its
+> measured elasticity are exactly what an insurer would not publish.
+>
+> So: the *structure* of the problem in §1 is derived and should hold generally; the
+> *numbers* in §2–§6 are properties of a simulator. **§7 measures how much depends on the
+> allocation being right, and the answer is: for one model family, a great deal.**
+
 ---
 
 ## 1. What makes this problem its own thing
@@ -360,7 +379,84 @@ Where it should still matter is *within* a model — tuning, and deciding which 
 spend capacity on — because that is where the 2,560,000:1 ratio in §6.1 actually bites. That
 has not been tested and should not be claimed.
 
-## 7. Status
+## 7. How much depends on the allocation being exactly 0.1 / 0.8 / 0.1?
+
+`experiments/22_propensity_sensitivity.py`. The right question to ask of a number taken on
+trust, and it has a clean answer, because **misspecifying $\pi$ is a gauge transform**:
+
+$$\log \hat s_k \;=\; \log b_k - \log \pi'_k \;=\; \log s_k + \bigl(\log \pi_k - \log \pi'_k\bigr)$$
+
+which is exactly the map of [`CONSTRAINED.md`](CONSTRAINED.md) with
+$c_k = \pi_k/\pi'_k$. So the theorem predicts the damage in closed form — and it does, **to
+0.0000** across every case tested.
+
+### 7.1 Symmetric error: survivable. Asymmetric error: fatal.
+
+Generated with the true allocation, analysed as if it were 0.1/0.8/0.1 (true mean ε = 2.124):
+
+| true allocation | estimated ε | bias |
+|---|---|---|
+| 0.10 / 0.80 / 0.10 *(correct)* | 2.196 | — |
+| 0.05 / 0.90 / 0.05 | 1.932 | −0.135 |
+| 0.20 / 0.60 / 0.20 | 2.319 | +0.163 |
+| **0.08 / 0.80 / 0.12** | **0.103** | **−2.022** |
+| **0.12 / 0.80 / 0.08** | **4.208** | **+2.016** |
+
+**Getting the side arms wrong by two percentage points *asymmetrically* destroys the
+estimate** — the elasticity falls from a true 2.12 to 0.10, a 95% error, which would flip
+every pricing decision that depends on whether ε exceeds 1. Symmetric error is nearly
+harmless by comparison.
+
+That asymmetry is not a curiosity. Realised allocations drift; exclusion rules bite one arm
+more than the other; a staged rollout ramps the discount arm before the loading arm. Two
+points of asymmetry is an ordinary amount of operational slippage.
+
+*(A prediction of mine to correct: I expected symmetric error to bias the slope by* exactly
+*zero, since the log-error vector is symmetric. It is small but not zero — −0.135 rather
+than 0 — because ±10% is **not symmetric in logs**: log 0.9 = −0.105 against
+log 1.1 = +0.095. The projection therefore does not quite cancel.)*
+
+### 7.2 Only one model family cares
+
+| model | reads π? | ε at true π | ε at wrong π |
+|---|---|---|---|
+| `conversion_glm` | no | 2.016 | 2.016 |
+| `conversion_gbm_v2` | no | 3.153 | 3.153 |
+| `arm_posterior` | **yes** | 2.196 | 2.331 |
+
+The GLM and GBM take the price as a feature and never touch the allocation, so a
+misspecified π **cannot** hurt them. Given how uncertain the 0.1/0.8/0.1 figure is, that is
+a robustness advantage the parametric models had all along and which none of the earlier
+comparisons counted.
+
+### 7.3 The realistic failure: π is not constant
+
+Staged rollouts, channel-specific test rates and business overrides all make $\pi_k(x)$ vary.
+Simulating a test run at 0.2/0.6/0.2 on aggregator traffic and 0.02/0.96/0.02 elsewhere
+(pooled realised share 0.120/0.763/0.118):
+
+| handling | bias | RMSE |
+|---|---|---|
+| assume the pooled average | −0.451 | 2.013 |
+| assume the design 0.1/0.8/0.1 | −0.327 | 1.989 |
+| **use the true $\pi_k(x)$ per row** | **−0.282** | **1.926** |
+
+A constant π is not a harmless approximation. The fix is cheap and exact — **record
+$\pi_k(x)$ per quote at assignment time and carry it through** — but it has to be designed
+in. Reconstructing it afterwards from realised shares is the first row of that table.
+
+### 7.4 What I would ask before trusting any of this on a real book
+
+1. Is the allocation the *design* or the *realised* one, and how far apart are they?
+2. Is it symmetric between the discount and loading arms — to how many decimal places?
+3. Were any segments excluded, capped, or ramped at a different rate or on a different date?
+4. Is $\pi$ recorded per quote at assignment, or reconstructed later from shares?
+5. What is the actual conversion rate and loss ratio, so the simulator can be calibrated to
+   something rather than to my assumptions?
+
+Questions 2 and 4 are the ones that decide whether the arm-posterior family is usable at all.
+
+## 8. Status
 
 The simulator, the model set, the decision layer and the diagnostics are in
 `elasticity_lab/insurance.py`. This document records

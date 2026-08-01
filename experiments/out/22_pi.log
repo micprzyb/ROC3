@@ -1,0 +1,63 @@
+============================================================================================================
+1.  MISSPECIFYING pi IS A GAUGE TRANSFORM -- THE BIAS IS PREDICTABLE IN CLOSED FORM
+============================================================================================================
+                                              true pi                         case                                            log error by arm  predicted slope bias  predicted arc1 bias  predicted arc2 bias
+  [np.float64(0.1), np.float64(0.8), np.float64(0.1)]                      correct         [np.float64(0.0), np.float64(0.0), np.float64(0.0)]               -0.0000              -0.0000              -0.0000
+[np.float64(0.05), np.float64(0.9), np.float64(0.05)]      symmetric, sides halved [np.float64(-0.693), np.float64(0.118), np.float64(-0.693)]               -0.1348              -7.6967              +8.5083
+  [np.float64(0.2), np.float64(0.6), np.float64(0.2)]     symmetric, sides doubled  [np.float64(0.693), np.float64(-0.288), np.float64(0.693)]               +0.1631              +9.3093             -10.2909
+[np.float64(0.08), np.float64(0.8), np.float64(0.12)]  asymmetric, dear arm bigger    [np.float64(-0.223), np.float64(0.0), np.float64(0.182)]               -2.0223              -2.1179              -1.9129
+[np.float64(0.12), np.float64(0.8), np.float64(0.08)] asymmetric, cheap arm bigger    [np.float64(0.182), np.float64(0.0), np.float64(-0.223)]               +2.0155              +1.7305              +2.3412
+
+  The symmetric rows have a predicted SLOPE bias of exactly zero while their ARC biases are
+  +/-8 or more.  A symmetric error in the side-arm rate cancels in the linear projection.
+  The asymmetric rows do not cancel.  Now measure it.
+============================================================================================================
+2.  MEASURED: generate with the true pi, analyse as if it were 0.1/0.8/0.1
+============================================================================================================
+  correct done
+  symmetric, sides halved done
+  symmetric, sides doubled done
+  asymmetric, dear arm bigger done
+  asymmetric, cheap arm bigger done
+
+                        case  true_mean_eps  eps_correct_pi  eps_assumed_pi  measured_slope_bias  predicted_slope_bias  prediction_error
+                     correct        +2.1242         +2.1957         +2.1957              +0.0000               -0.0000           +0.0000
+     symmetric, sides halved        +2.1242         +2.0667         +1.9319              -0.1348               -0.1348           -0.0000
+    symmetric, sides doubled        +2.1242         +2.1561         +2.3191              +0.1631               +0.1631           +0.0000
+ asymmetric, dear arm bigger        +2.1242         +2.1247         +0.1025              -2.0223               -2.0223           +0.0000
+asymmetric, cheap arm bigger        +2.1242         +2.1926         +4.2080              +2.0155               +2.0155           -0.0000
+
+  gauge theorem predicts the bias to within 0.0000   -> CONFIRMED
+
+============================================================================================================
+3.  WHICH MODELS DEPEND ON pi AT ALL?
+============================================================================================================
+            model  uses_pi  eps_true_pi  eps_wrong_pi   shift
+   conversion_glm    False      +2.0157       +2.0157 +0.0000
+conversion_gbm_v2    False      +3.1529       +3.1529 +0.0000
+    arm_posterior     True      +2.1957       +2.3305 +0.1348
+
+  Only the arm-posterior family reads pi.  The GLM and the GBM take the price as a feature
+  and never touch the allocation, so a misspecified pi cannot hurt them -- which, given how
+  uncertain the 0.1/0.8/0.1 figure is, is a point in their favour that had not been counted.
+
+============================================================================================================
+4.  THE REALISTIC FAILURE: pi VARIES BY SEGMENT AND IS ASSUMED CONSTANT
+============================================================================================================
+Staged rollouts, channel-specific test rates and business overrides all produce
+this.  Here the test is run at 0.2/0.6/0.2 on aggregator traffic and 0.02/0.96/0.02
+elsewhere, then analysed as if it were the pooled average.
+
+  realised pooled allocation: [0.1197 0.7627 0.1176]
+
+                     handling  mean_eps    bias    rmse
+    assume the pooled average   +1.6734 -0.4508 +2.0126
+assume the design 0.1/0.8/0.1   +1.7976 -0.3266 +1.9885
+ use the true pi_k(x) per row   +1.8421 -0.2821 +1.9258
+
+  A constant pi is not a harmless approximation when the test was not run uniformly.  The
+  fix is cheap and exact -- record pi_k(x) per quote at assignment time and carry it -- but
+  it has to be DESIGNED IN.  Reconstructing it afterwards from realised shares is precisely
+  the pooled-average row.
+
+wrote experiments/out/22_*.csv
