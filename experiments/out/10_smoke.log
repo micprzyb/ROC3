@@ -1,0 +1,24 @@
+real panel (180233, 33), 3218 products, 103 weeks
+perturb_price moves log_price, rel_price and price_change together: OK
+
+=== REAL DATA (no ground truth — only internal consistency) ===
+             model  avg_eps  eps_sd  in_rmse     secs
+     pooled_loglog  +1.5104 +0.0000  +0.9888  +1.1000
+         twoway_fe  +1.5091 +0.0000  +0.9801  +2.3000
+       poisson_glm  +1.6177 +0.0000  +1.1646  +7.9000
+       lgbm_demand  +2.1816 +1.8890  +0.7279  +5.5000
+   dml_partialling  +1.0296 +0.0000  +0.7079 +19.6000
+         r_learner  +1.1599 +0.7936  +0.7079 +21.2000
+shrunk_per_product  +1.7449 +0.7369  +1.0354  +0.6000
+
+synthetic frame (180233, 41); true mean elasticity +1.6560
+
+=== SYNTHETIC (graded on recovery) ===
+             model  avg_eps  eps_sd  in_rmse     secs  true_mean    bias  eps_rmse  eps_corr
+     pooled_loglog  +0.8707 +0.0000  +1.3025  +0.2000    +1.6560 -0.7853   +1.0584       NaN
+         twoway_fe  +0.9636 +0.0000  +0.6487  +2.3000    +1.6560 -0.6924   +0.9914       NaN
+       poisson_glm  +2.2017 +0.0000  +4.3150 +17.8000    +1.6560 +0.5458   +0.8951       NaN
+       lgbm_demand  +1.0785 +0.8570  +0.7377  +4.8000    +1.6560 -0.5775   +1.0896   +0.3160
+   dml_partialling  +1.5823 +0.0000  +0.7503 +22.4000    +1.6560 -0.0737   +0.7133       NaN
+         r_learner  +1.5228 +0.8659  +0.7503 +23.0000    +1.6560 -0.1332   +0.8993   +0.3762
+shrunk_per_product  +0.5306 +0.7798  +0.8888 +17.4000    +1.6560 -1.0934   +1.2227   +0.7340

@@ -31,7 +31,8 @@ reproduces `sklearn.metrics.roc_auc_score` **to machine precision** (2×10⁻¹�
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install numpy scipy matplotlib scikit-learn pandas plotly
+.venv/bin/pip install -r requirements.txt   # roc3 alone needs only numpy scipy
+                                            # matplotlib scikit-learn pandas plotly
 
 .venv/bin/python experiments/01_validation.py          # 12 sections of checks
 .venv/bin/python experiments/02_demo.py                # writes figures/
@@ -213,6 +214,66 @@ written as a tutorial on one three-atom world you can check by hand.
 
 ![ceiling](figures/08_constrained_ceiling.png)
 
+---
+
+## `elasticity_lab` — the same problem on real, observational data
+
+The price-test story above assumes randomisation. `elasticity_lab/` drops that assumption
+and builds elasticity models on a public panel — **UCI Online Retail II**, 1,067,371
+transaction lines, 3,218 products × 103 weeks — where prices moved because a business moved
+them, not because anyone randomised.
+
+```bash
+python experiments/10_model_zoo_smoke.py         # seven estimators, full panel
+python experiments/11_hpo_experiment.py 1200 30  # the objective experiment
+python experiments/12_final_comparison.py        # tuned models, full diagnostic battery
+cd notebooks && jupyter nbconvert --to notebook --execute --inplace 0*.ipynb
+```
+
+| notebook | question |
+|---|---|
+| [`01_data_and_the_identification_problem`](notebooks/01_data_and_the_identification_problem.ipynb) | Is the question answerable here, and why does the obvious regression fail? |
+| [`02_model_zoo`](notebooks/02_model_zoo.ipynb) | Seven estimators — what each assumes, what each recovers. |
+| [`03_hyperparameter_optimization`](notebooks/03_hyperparameter_optimization.ipynb) | **How do you tune a model whose target you cannot observe?** |
+| [`04_comparison_and_selection`](notebooks/04_comparison_and_selection.ipynb) | Is the heterogeneity real, and what is it worth? |
+
+**The central finding.** Ordinary HPO minimises held-out predictive loss. That is the wrong
+objective for an elasticity model, and not by a little: `log q` is dominated by product
+identity, season and last week's sales, so a search buys RMSE by *flattening the price
+dimension* and returns a well-tuned model with an attenuated elasticity. On the graded
+benchmark the best-predicting model (`lgbm_demand`, the lowest RMSE in the zoo) understates
+elasticity by **35%**, while Double ML — same boosting, same features, same hyperparameters
+— comes in at a bias of −0.074 on a true mean of 1.656, because it estimates the price
+effect from **residuals** rather than reading it off a fitted surface.
+
+Switching the tuning objective alone takes the S-learner's elasticity error from **2.60 to
+0.99 (−62%)** for 0.15 of predictive RMSE; 6 of 7 models improve. Median rank correlation
+with the truth across a search: **+0.90** for the R-loss against **−0.20** for predictive
+RMSE, which *anti-ranks for 4 of 7 models*.
+
+The fix is to tune on the **R-loss**, `mean((ry − θ̂(x)·rt)²)` on residualised data: it is
+computable from observed data, minimised at the true elasticity function, and
+model-agnostic, so a fixed-effects regression and a boosted tree are comparable on one axis.
+The decisive test is not which objective scores lower but **which one ranks configurations
+the way the truth does**.
+
+Two things the write-ups usually miss, both established here as exact statements:
+
+* A pooled regression does not estimate the average elasticity; it estimates a
+  **variance-weighted** average, in which products whose price moved most dominate. That
+  channel **survives at exactly zero confounding** — it is a second, independent defect
+  that controlling for confounders does not touch. The decomposition is an identity,
+  checked to `+0.0000`.
+* `revenue / quantity` is not a price. Bigger order lines are discounted
+  (`d log price / d log qty = −0.1212`, t = −500), so unit value moves with the week's
+  quantity for arithmetic reasons — inflating the fixed-effects elasticity from **1.571 to
+  2.004**.
+
+Evaluation without labels works at the level of **groups**: GATES for the ranking, a BLP
+test for the scale, and policy value for the money — each benchmarked against the best
+*constant* elasticity, because a heterogeneous model that cannot beat one flat number has
+bought nothing. Full reference: [`docs/ELASTICITY_MODELS.md`](docs/ELASTICITY_MODELS.md).
+
 ## More than three classes
 
 The plot stops at three — that is geometry, not a missing feature. The rank statistic
@@ -238,6 +299,16 @@ roc3/
   inference.py   closed-form SE, bootstrap, permutation test
   plots.py       the dashboards (matplotlib) + interactive plotly HTML
   datasets.py    synthetic problems with known ground truth, plus the wine demo
+elasticity_lab/
+  data.py        UCI Online Retail II -> a clean product-week panel (and the price trap)
+  features.py    leakage-safe features, controls and treatment kept separate
+  splits.py      rolling-origin / purged / grouped CV, and the leak measured
+  simulate.py    semi-synthetic benchmark with a KNOWN elasticity, and an exact bias identity
+  models.py      seven estimators, pooled OLS through Double ML and the R-learner
+  tuning.py      Optuna search spaces, the R-loss objective, pruning, nested CV
+  evaluation.py  GATES, BLP calibration, policy value — scoring with no labels
+  bench.py       the two standard frames every notebook starts from
+notebooks/       four executed, explanatory notebooks
 docs/
   TUTORIAL.md    start here: the whole construction worked by hand, every symbol defined
   PLAN.md        the design: every approach considered, the maths, the chosen one
@@ -245,6 +316,7 @@ docs/
   PRICETEST.md   a worked application: which price arm was this buyer in?
   ELASTICITY.md  grading a price-elasticity model that has no labels to grade against
   ELASTICITY_TUTORIAL.md   the same, built up on a 900-customer worked example
+  ELASTICITY_MODELS.md     elasticity models on real observational data; HPO as the problem
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study

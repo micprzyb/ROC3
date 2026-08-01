@@ -1,0 +1,120 @@
+threads=8  n_products=1200  n_trials=30
+rows                                                                   67057
+products                                                                1200
+weeks                                                                    103
+first_week                                                        2009-12-07
+last_week                                                         2011-12-05
+median_weeks_per_product                                                51.0
+sd_log_price_within_product                                         0.482297
+source                         semi-synthetic (UCI prices, simulated demand)
+true_mean_elasticity                                                  1.6408
+true_sd_elasticity                                                    0.6982
+
+4 folds; sizes [(17645, 4867), (32112, 5440), (46173, 5253), (61018, 5295)]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+pooled_loglog        rmse   rmse= 1.3631 rloss=  0.8391 oracle= 1.2544 bias=-1.0396  [   23s, 22 kept / 8 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+pooled_loglog        rloss  rmse= 1.8260 rloss=  0.7533 oracle= 0.8773 bias=-0.5166  [    4s, 30 kept / 0 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+twoway_fe            rmse   rmse= 0.8179 rloss=  0.7749 oracle= 1.0266 bias=-0.7479  [   77s, 24 kept / 6 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+twoway_fe            rloss  rmse= 0.8185 rloss=  0.7748 oracle= 1.0262 bias=-0.7473  [   92s, 30 kept / 0 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+poisson_glm          rmse   rmse= 1.9354 rloss=  0.7919 oracle= 1.0463 bias=-0.7751  [  880s, 22 kept / 8 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+poisson_glm          rloss  rmse= 2.1094 rloss=  0.7913 oracle= 1.0454 bias=-0.7739  [  777s, 25 kept / 5 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+lgbm_demand          rmse   rmse= 0.7464 rloss=  2.4518 oracle= 2.6043 bias=-0.4980  [  427s, 30 kept / 0 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+lgbm_demand          rloss  rmse= 0.8957 rloss=  0.8045 oracle= 0.9911 bias=-0.7204  [  198s, 27 kept / 3 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+dml_partialling      rmse   rmse= 0.8115 rloss=  0.7548 oracle= 0.7630 bias=-0.2738  [ 2040s, 27 kept / 3 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+dml_partialling      rloss  rmse= 1.0223 rloss=  0.7497 oracle= 0.8105 bias=-0.3970  [ 1133s, 30 kept / 0 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+r_learner            rmse   rmse= 0.8121 rloss=  0.8241 oracle= 0.9708 bias=-0.2412  [ 1209s, 28 kept / 2 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+r_learner            rloss  rmse= 1.0745 rloss=  0.7417 oracle= 0.8183 bias=-0.5161  [  736s, 25 kept / 5 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+shrunk_per_product   rmse   rmse= 1.1610 rloss=  0.8485 oracle= 1.3797 bias=-1.2383  [   42s, 30 kept / 0 pruned / 0 failed]
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:319: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+shrunk_per_product   rloss  rmse= 1.1657 rloss=  0.8281 oracle= 1.2948 bias=-1.1675  [   38s, 23 kept / 7 pruned / 0 failed]
+
+====================================================================================================
+DOES THE TUNING OBJECTIVE CHANGE WHAT YOU GET?
+====================================================================================================
+                    oracle[rloss]  oracle[rmse]  oracle_bias[rloss]  oracle_bias[rmse]  rmse[rloss]  rmse[rmse]  oracle_gain_from_rloss  rmse_cost_of_rloss
+model                                                                                                                                                      
+dml_partialling           +0.8105       +0.7630             -0.3970            -0.2738      +1.0223     +0.8115                 -0.0475             +0.2107
+r_learner                 +0.8183       +0.9708             -0.5161            -0.2412      +1.0745     +0.8121                 +0.1525             +0.2624
+pooled_loglog             +0.8773       +1.2544             -0.5166            -1.0396      +1.8260     +1.3631                 +0.3771             +0.4629
+lgbm_demand               +0.9911       +2.6043             -0.7204            -0.4980      +0.8957     +0.7464                 +1.6132             +0.1493
+twoway_fe                 +1.0262       +1.0266             -0.7473            -0.7479      +0.8185     +0.8179                 +0.0004             +0.0006
+poisson_glm               +1.0454       +1.0463             -0.7739            -0.7751      +2.1094     +1.9354                 +0.0009             +0.1740
+shrunk_per_product        +1.2948       +1.3797             -1.1675            -1.2383      +1.1657     +1.1610                 +0.0849             +0.0047
+
+Across the zoo:
+  models where tuning on R-loss recovered elasticity better : 6 / 7
+  median improvement in oracle RMSE                         : +0.0849
+  median predictive RMSE given up to get it                 : +0.1740
+
+====================================================================================================
+IS R-LOSS A USABLE PROXY FOR THE UNKNOWABLE ORACLE?
+(rank correlation across all trials of a search — the criterion HPO actually needs)
+====================================================================================================
+             model  n_trials  spearman(rloss, oracle)  spearman(rmse, oracle)
+   dml_partialling        57                   -0.967                  +0.399
+       lgbm_demand        57                   +0.936                  -0.439
+       poisson_glm        47                   -0.143                  -0.870
+     pooled_loglog        52                   +0.999                  -0.538
+         r_learner        53                   +0.741                  -0.204
+shrunk_per_product        53                   +0.903                  +0.232
+         twoway_fe        54                   +0.922                  +0.555
+
+Positive = the objective ranks hyperparameters the same way the truth does.
+This is the property that matters: an objective can be a poor absolute proxy and
+still be a good selector, and vice versa.
+
+wrote experiments/out/11_*.csv|parquet

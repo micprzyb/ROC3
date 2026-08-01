@@ -1,0 +1,6 @@
+observable metric,n_models,rho with oracle_rmse
+lift_over_uniform,7,0.6698938453032356
+rmse,7,-0.17857142857142858
+r2,7,-0.17857142857142858
+rloss_skill,7,-0.17857142857142858
+rloss_vs_constant,7,-0.17857142857142858

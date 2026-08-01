@@ -17,3 +17,8 @@ dist/
 .idea/
 .DS_Store
 *.swp
+
+# elasticity_lab: downloaded and derived data (elasticity_lab.data rebuilds it on demand,
+# ~45 MB from UCI on first call).  The panel is reproducible and fingerprinted, so there is
+# nothing to gain by versioning 95 MB of it.
+data/

@@ -503,6 +503,265 @@ decimals); balanced accuracy and worst-class sensitivity by LP.
 
 ---
 
+## J. Elasticity models on real observational data (`elasticity_lab/`)
+
+Everything above assumed randomisation. This section is the log for dropping that
+assumption and building elasticity models on UCI Online Retail II. Reference write-up:
+[`ELASTICITY_MODELS.md`](ELASTICITY_MODELS.md).
+
+### J.1 Dataset choice
+
+**J1 — Which public dataset?** Requirements: real prices, real quantities, genuine
+*within-product price variation*, and a permissive licence. Considered and rejected:
+Dominick's Finer Foods (excellent, but the store-week files are large and the price field
+needs the deal-code join to be meaningful); Instacart (no prices at all); Rossmann /
+Favorita (promotion flags, no unit prices); Amazon review corpora (no quantities).
+**[USED]** UCI Online Retail II — 1,067,371 lines, 3,218 usable products × 103 weeks, and
+81% of retained products move log price by more than 0.10. The variation is observational,
+which is precisely the difficulty worth working on.
+
+**J2 — Aggregation grain.** Transaction-level would keep the most data but has no notion of
+"the price this week", and the outcome would be a selected sample (only buyers appear).
+**[USED]** product × ISO-week, with products active in ≥ 20 weeks. Rejected: product ×
+month (only 24 periods, kills the time-series CV); product × customer × week (mostly empty).
+
+### J.2 The price-measurement trap
+
+**J3 — `revenue / quantity` as the price.** **[REJECTED, and the rejection is a result]**
+Within a product-week, `d log(line price) / d log(line quantity) = −0.121` (t = −500):
+bigger orders are discounted. So a week containing one large order mechanically shows a low
+unit value and a high quantity — **division bias** (Borjas 1980; Deaton 1988), a
+downward-sloping demand curve made of arithmetic. Measured effect on the answer: the
+fixed-effects elasticity goes from **1.571** (modal price) to **2.004** (unit value), a
+27.6% overstatement, with tiny standard errors in both cases (0.008).
+
+**J4 — Which price then?** Tried median line price (1.555) and **[USED]** modal posted line
+price (1.571). Both are functions of the *posted* price rather than of the week's quantity,
+which is the property that matters. All three columns are kept in the panel so the bias can
+be demonstrated rather than asserted.
+
+### J.3 The benchmark
+
+**J5 — How do you grade a method when the label does not exist?** Options considered:
+(a) hold out and check predictive accuracy — measures the wrong thing;
+(b) compare methods to each other and call the consensus truth — circular;
+(c) find a dataset with a real randomised price experiment — none public at this scale;
+(d) **[USED]** a semi-synthetic twin: keep the real prices, covariates and calendar, replace
+only the quantities with a known demand system.
+
+**J6 — Should the confounder be observable?** **[USED]** `u = h(X)`, a *nonlinear function
+of observed controls*. Making `u` genuinely unobservable would be more pessimistic and
+completely uninformative: no method could succeed and every hyperparameter setting would
+look equally bad, so the benchmark would not discriminate. Making it *linear* in the
+controls would let OLS win trivially. Nonlinear-but-observable is the setting in which
+tuning actually decides the outcome, which is what we want to study.
+
+**J7 — Lagged-quantity controls are lags of the *real* series, not the simulated one.**
+**[ACCEPTED, documented]** Regenerating them from simulated quantities would make `g(X)`
+circular and destroy the exact bias identity. The world stays self-consistent (the
+simulated demand is built as a function of the observed controls); the cost is that the
+synthetic series is not autoregressive in its own history, so predictive R² is lower here
+than on the real panel. The benchmark exists to grade elasticity recovery, not forecasting.
+
+**J8 — The naive-bias decomposition, and a false start.** First version was an approximate
+formula that claimed "the arithmetic checks out" when it did not (predicted +0.147, actual
+−0.290). Replaced with an **exact channel decomposition** verified against the realised OLS
+coefficient. Two bugs surfaced during that verification and both mattered: a sign error on
+the heterogeneity term, and a `ddof` mismatch (`np.cov` uses `ddof=1`, `np.var` defaults to
+`0`), which together left a residual of +0.4353. Identity now holds to `-0.0000`.
+
+**J9 — The result that came out of J8, which I did not expect.** There is a bias channel
+that has nothing to do with confounding. A pooled regression recovers `Cov(p, ε·p)/Var(p)`
+— a *variance-weighted* average in which products whose price moved most dominate — not the
+plain mean. At the default confounding it contributes −0.218 against the confounder's
+−0.147, i.e. it is the *larger* of the two; at the stronger setting used in the notebooks
+(θ = 0.6) the confounder dominates at −0.312 and heterogeneity contributes −0.117. The
+config-independent statement is the decisive one: set confounding to **exactly zero** and
+the heterogeneity channel is **−0.295, larger than before, not smaller**. Two independent
+problems needing different tools; controlling for confounders fixes only one. This is §2 of
+the reference document and §1.5 of notebook 1.
+
+*Care needed when quoting this.* An early draft of the write-up claimed "the largest single
+channel is not the confounder" as though it were a property of the data. It is a property
+of θ, and at the setting the notebooks actually run it is false. Corrected to the claim that
+does not depend on θ.
+
+### J.4 Cross-validation
+
+**J10 — Two leak channels, not one.** Shuffled K-fold leaks through *time* (lags, rolling
+means, and panel-wide `prod_*` statistics) and through *product identity* (memorising a
+SKU's level). Measured: `NaiveKFold` shares 515 train/validation week-pairs and 100% of
+validation products. **[USED]** rolling origin as the HPO default (matches deployment),
+with purged (embargo 12) and grouped-by-product variants for the other two questions.
+`NaiveKFold` is shipped deliberately so the leak can be *measured*.
+
+### J.5 Bugs found and fixed
+
+**J11 — `n_jobs=-1` was a 340× slowdown.** The single most expensive mistake here. On the
+24-core host, one LightGBM fit on 21,806 × 23:
+
+| `n_jobs` | seconds |
+|---|---|
+| 1 | 0.33 |
+| 4 | 0.12 |
+| 8 | **0.09** |
+| −1 | **30.68** |
+
+The trees are small and the threads spend their time synchronising. This was diagnosed
+badly at first: two of my own runs were competing for the same cores, and `grep`'s block
+buffering hid the progress output, so it looked like a hang in `PoissonGLM`. Lessons: pipe
+through nothing when watching a long job, and never trust `-1` on small data.
+`N_THREADS = min(8, cores/2)`, overridable with `ELASTICITY_LAB_THREADS`.
+
+**J12 — Poisson by IRLS does not finish.** statsmodels' GLM uses IRLS, whose weights equal
+the fitted mean; with weekly quantities in the thousands the working Hessian is badly
+conditioned and the solver crawls. **[USED]** `sklearn.linear_model.PoissonRegressor`
+(L-BFGS) on the standardised design, coefficients transformed back: 1.6 s. This was
+initially misattributed to a hang caused by J11.
+
+**J13 — Collinear controls in the fixed-effects model.** A control constant within week
+(`week_idx`, `woy_sin`, `is_q4`) is exactly collinear with the week effects; one constant
+within product (`prod_log_price_mean`) with the product effects. After demeaning they are
+zero up to floating-point residue, and OLS by pseudo-inverse assigns them enormous
+coefficients fitted to that residue. Held-out RMSE: **3.6 × 10⁷** against a constant-mean
+baseline of 1.75. The columns separate cleanly into exactly absorbed (ratio ≤ 2.5e-8),
+*nearly* absorbed (`market_log_qty`, `market_log_price`, 0.9–1.5% — leave-one-out week
+aggregates, almost but not quite week-constant) and genuinely within-varying (≥ 23%).
+A floating-point-scale tolerance keeps the dangerous middle group, so `collinear_tol`
+defaults to **2%**. Dropping them fixed the held-out RMSE (0.98 vs 1.75) **and** moved the
+synthetic elasticity from 0.149 to 0.925 — the near-collinearity was corrupting the slope,
+not just the levels.
+
+**J14 — Reconstructing the FE levels needs iteration.** Product and week means are not
+orthogonal in an unbalanced panel, so one pass of "remove product means, then week means"
+leaves a large remainder; in-sample RMSE was 14.0. Fixed with the same Gauss-Seidel
+alternation used for the slopes, applied to the levels. Separately: a future week's effect
+is *not identified*, so `predict_log_qty` uses the mean of the last four estimated week
+effects. This model is an inference tool that can also predict, not a forecaster.
+
+**J15 — The finite-difference elasticity was measuring the wrong derivative.**
+`rel_price`, `price_change` and `is_discounted` are all functions of `log_price`. Moving
+`log_price` alone holds the discount depth fixed *while changing the price*, which is not a
+price change. `perturb_price` moves all of them together; the notebook quantifies the gap.
+
+**J16 — `make_synthetic_panel` returns a feature frame, not a panel.** Calling
+`add_features` on its output collided on every engineered column
+(`KeyError: 'prod_log_price_sd'` after the merge suffixed them). Documented in the
+docstring rather than defended against, because the alternative (idempotent
+`add_features`) hides the mistake.
+
+### J.6 The HPO question
+
+**J17 — Objectives considered.** (a) predictive RMSE of `log q` — what everyone does, and
+wrong here; (b) **[USED]** the orthogonal **R-loss**, `mean((ry − θ̂·rt)²)` on residualised
+data, whose population minimiser is the true `θ(·)` and which is *model-agnostic*, so a
+fixed-effects regression and a boosted tree land on the same axis; (c) oracle elasticity
+RMSE — the grader, never a legitimate objective on real data; (d) rejected: an IV-style
+first-stage F, which needs an instrument we do not have; (e) rejected: calibration of the
+predicted-vs-realised revenue response, which is downstream of the elasticity and so
+inherits its bias.
+
+**J18 — The nuisance models must be shared across candidates.** If each candidate brought
+its own residuals, a candidate could win by being paired with a lucky nuisance fit.
+`CausalScorer` fits them once per fold and caches. This is not an optimisation; it is what
+makes the comparison mean anything.
+
+**J19 — The decisive statistic is rank correlation, not level.** "Which objective gives the
+lower oracle error" depends on where one search happened to land. HPO does not need an
+objective numerically close to the truth — a monotone transform of the truth would be
+perfect while being numerically nothing like it. It needs one that **orders configurations
+the way the truth does**. Every trial therefore records *all* metrics, so a completed
+search can be re-read under a different objective with no refitting, and the rank
+correlation is free.
+
+**J20 — Two normalisations of the R-loss.** A raw R-loss is on the scale of `var(ry)` and
+means nothing alone. `rloss_skill = 1 − R/R(θ=0)` reads as improvement over "price does
+nothing"; `rloss_vs_constant = 1 − R/R(best constant θ)` reads as improvement over one
+elasticity for everyone. The second is the strict one and the **only honest evidence that
+estimated heterogeneity is real**, because the best constant is fitted on the same
+validation fold.
+
+### J.7 Results, and two hypotheses the data refuted
+
+**J21 — The headline.** 1,200 products, 30 trials, 373 completed trials, ~2 hours.
+**6 of 7 models recover elasticity better when tuned on the R-loss.** Largest gain: the
+S-learner, oracle RMSE **2.6043 → 0.9911 (−62%)** for +0.149 of predictive RMSE. Median
+rank correlation with the oracle across a search: **+0.903** for the R-loss against
+**−0.204** for predictive RMSE, which **anti-ranks for 4 of 7 models**.
+
+**J22 — The exception, which is real.** `dml_partialling` is the one model the R-loss ranks
+*backwards* (ρ = −0.967). Mechanism: a Double ML estimate is Neyman-orthogonal, so its
+elasticity barely moves with its own nuisance hyperparameters, while the R-loss is scored
+with a *fixed* nuisance model shared by all candidates. Whatever residual confounding that
+scoring model leaves defines the θ it prefers, and that θ is slightly biased — so candidates
+closer to the truth score marginally worse. **The R-loss is only as good as the nuisance
+model scoring it.** What makes the mistake cheap is not orthogonality but the stakes: DML's
+oracle error spans only **0.121** across all 57 configurations tried (the narrowest in the
+zoo), against **4.185** for the S-learner. The R-loss helps most where the choice matters
+most and fails on the model where it matters least. Note `r_learner` is also orthogonal and
+ranks +0.741, so this is not a property of orthogonal estimators as a class.
+
+**J23 — `delta` is the most consequential hyperparameter, and I was wrong twice about why.**
+The two S-learner winners differ most in the finite-difference step: 0.184 (R-loss) against
+0.015 (RMSE). Holding one *fitted model fixed* and varying only the step moves the oracle
+RMSE from **4.24 to 0.74** — a factor of 5.7 with nothing about the fit changing.
+
+  *Refuted hypothesis 1:* "a small step attenuates the elasticity toward zero." It does not.
+  The **bias is flat to within 0.02** across a 60× range of δ (−0.434 at 0.005, −0.455 at
+  0.30). What δ controls is **variance**: a boosted tree is piecewise constant in log price,
+  so a sub-leaf step divides an almost-always-zero numerator by an almost-zero denominator.
+  The average survives intact; the per-row predictions are destroyed.
+
+  *Refuted hypothesis 2:* "deeper trees shrink the leaves, so the dead zone grows." The
+  opposite — 16.0% of rows dead at 8 leaves, 1.8% at 255 — because more leaves means more
+  price splits available to cross.
+
+  Both are logged rather than deleted because the corrected statement is the useful one: a
+  model can have a respectable *average* elasticity and worthless per-row predictions, and
+  predictive RMSE cannot see the difference at all (the fitted surface is identical for
+  every δ, so predictive loss is *exactly* the same while elasticity error moves 5.7×).
+  Reported in `experiments/15_why_delta_matters.py`.
+
+### J.8 Bugs found after the zoo was working
+
+**J24 — `tune()` returned unusable hyperparameters.** `best_params` was reconstructed by
+reading a row out of the history DataFrame. A row has one dtype, so every integer came back
+as a float and LightGBM rejected `num_iterations = "450.0"` outright. Invisible during the
+search itself (Optuna passes correctly-typed values) and only surfaced when
+`12_final_comparison.py` tried to *rebuild* the winning models — where it took out three of
+seven models at once. Fixed by keeping each trial's parameter dict verbatim in a side store.
+The already-written artefact is repaired in `14_hpo_analysis.py` rather than by re-running a
+two-hour search for a type.
+
+**J25 — A silent key collision in the evaluation battery.** `evaluate_model` set
+`avg_elasticity = mean(model's predictions)`, then merged in `blp_calibration`'s output —
+which used the *same key* for `−beta0`, a data-derived estimate. The model's own average was
+overwritten wherever the BLP test ran, and set to NaN for every constant-elasticity model.
+Renamed to `blp_avg_elasticity`; both are now reported side by side, which is more useful
+anyway since their disagreement is informative.
+
+**J26 — Pruned trials were counted as failures.** `n_pruned` was computed as
+`len(history) − len(complete)`, but a pruned trial raises before it is ever appended to the
+history, so the column silently reported failures instead and always read zero. Taken from
+`study.trials` now. Pruning was in fact working: 3/20 on a check run, reaching the same
+optimum as an unpruned search.
+
+### J.9 Open questions here
+
+1. **Is the R-loss's advantage robust to the nuisance learner?** J22 makes this urgent
+   rather than academic: the one failure case is precisely a nuisance-quality artefact.
+   Everything here fixes one moderately-regularised LightGBM as the scoring nuisance, and
+   the sensitivity has not been mapped.
+2. **A DR/AIPW score for a continuous treatment** would give a policy-value estimator that
+   does not route through GATES bins. The binning is honest but loses resolution.
+3. **Cross-price effects.** Every model here treats products as independent. Substitution is
+   the obvious next term, and the panel has enough products to identify some of it.
+4. **The `outcome="poisson"` world** is implemented and used in the robustness check, but
+   the zoo has no negative-binomial member — overdispersion is real in this data and the
+   Poisson GLM's standard errors are consequently too small.
+
+---
+
 ## H. Open questions / what I would do next
 
 1. **Is geometric VUS = 3AFC VUS exactly, for any scorer?** F5 says the gap is under

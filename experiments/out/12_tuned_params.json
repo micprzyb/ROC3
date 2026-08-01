@@ -1,0 +1,112 @@
+{
+  "synthetic:pooled_loglog": {
+    "use_controls": false,
+    "ridge": 0.05227059655797889
+  },
+  "synthetic:twoway_fe": {
+    "add_controls": true,
+    "n_iter": 10,
+    "collinear_tol": 0.013728041266163145
+  },
+  "synthetic:poisson_glm": {
+    "use_controls": true,
+    "alpha": 0.8132918907645531,
+    "max_iter": 300
+  },
+  "synthetic:lgbm_demand": {
+    "n_estimators": 450,
+    "learning_rate": 0.020683985971591948,
+    "num_leaves": 39,
+    "min_child_samples": 14,
+    "subsample": 0.6821224884348791,
+    "colsample_bytree": 0.5195448904099973,
+    "reg_lambda": 0.03209692627410364,
+    "delta": 0.21698589191018938
+  },
+  "synthetic:dml_partialling": {
+    "n_estimators": 400,
+    "learning_rate": 0.04421291893432151,
+    "num_leaves": 88,
+    "min_child_samples": 6,
+    "subsample": 0.8333833577228338,
+    "colsample_bytree": 0.8023827217708956,
+    "reg_lambda": 0.0018293439416272846,
+    "n_folds": 2
+  },
+  "synthetic:r_learner": {
+    "n_estimators": 400,
+    "learning_rate": 0.10703046598241392,
+    "num_leaves": 116,
+    "min_child_samples": 10,
+    "subsample": 0.5476496634419191,
+    "colsample_bytree": 0.7808257411712962,
+    "reg_lambda": 0.6392208893881604,
+    "n_folds": 2,
+    "final_n_estimators": 50,
+    "final_learning_rate": 0.03505687375685197,
+    "final_num_leaves": 21,
+    "final_min_child_samples": 103,
+    "min_weight_quantile": 0.4701792521596131
+  },
+  "synthetic:shrunk_per_product": {
+    "min_obs": 23,
+    "min_price_sd": 0.0025474497182189208,
+    "tau2": 0.07304173538735519,
+    "demean_week": true
+  },
+  "real:pooled_loglog": {
+    "use_controls": true,
+    "ridge": 0.0018410177936315068
+  },
+  "real:twoway_fe": {
+    "add_controls": true,
+    "n_iter": 20,
+    "collinear_tol": 0.03438369366851066
+  },
+  "real:poisson_glm": {
+    "use_controls": true,
+    "alpha": 0.7301960999452984,
+    "max_iter": 200
+  },
+  "real:lgbm_demand": {
+    "n_estimators": 700,
+    "learning_rate": 0.11387317092169064,
+    "num_leaves": 63,
+    "min_child_samples": 52,
+    "subsample": 0.7118273996694524,
+    "colsample_bytree": 0.7875364678399936,
+    "reg_lambda": 0.042220489831498315,
+    "delta": 0.17645954556097573
+  },
+  "real:dml_partialling": {
+    "n_estimators": 250,
+    "learning_rate": 0.033078775415212265,
+    "num_leaves": 15,
+    "min_child_samples": 92,
+    "subsample": 0.8423796715256261,
+    "colsample_bytree": 0.6979175193833093,
+    "reg_lambda": 0.0003228297040732096,
+    "n_folds": 5
+  },
+  "real:r_learner": {
+    "n_estimators": 650,
+    "learning_rate": 0.03396540216391729,
+    "num_leaves": 35,
+    "min_child_samples": 103,
+    "subsample": 0.5301127358146349,
+    "colsample_bytree": 0.8000600292674006,
+    "reg_lambda": 1.0563971422974847,
+    "n_folds": 2,
+    "final_n_estimators": 100,
+    "final_learning_rate": 0.029236536416560464,
+    "final_num_leaves": 13,
+    "final_min_child_samples": 91,
+    "min_weight_quantile": 0.21930075673116017
+  },
+  "real:shrunk_per_product": {
+    "min_obs": 15,
+    "min_price_sd": 0.00034931130732581393,
+    "tau2": 0.0006971083457727915,
+    "demean_week": false
+  }
+}

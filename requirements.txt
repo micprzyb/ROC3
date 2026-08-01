@@ -1,5 +1,20 @@
+# --- roc3 (the 3-class ROC surface) --------------------------------------------------
 numpy>=1.24
 scipy>=1.10
 matplotlib>=3.7
 scikit-learn>=1.3
 plotly>=5.0
+
+# --- elasticity_lab (price-elasticity models on UCI Online Retail II) ----------------
+pandas>=2.0
+statsmodels>=0.14
+lightgbm>=4.0
+optuna>=3.4
+pyarrow>=14.0          # parquet caching of the panel
+openpyxl>=3.1          # reads the source .xlsx workbook
+
+# --- notebooks ------------------------------------------------------------------------
+nbformat>=5.9
+nbconvert>=7.0
+ipykernel>=6.0
+jinja2>=3.0            # pandas .style rendering

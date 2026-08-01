@@ -1,0 +1,101 @@
+============================================================================================
+§1  THE DATA
+============================================================================================
+panel 183,451 product-weeks | 3,218 products | 104 weeks | fingerprint 37e45faa3a46
+OK   §1   products with sd(log price) > 0.10  [%]            80.7644  (doc 80.8)
+OK   §1   products with sd(log price) < 0.02  [%]            10.0684  (doc 10.1)
+OK   §1   median weeks per product                           53.0000  (doc 53)
+
+============================================================================================
+§1.1  THE PRICE-MEASUREMENT TRAP
+============================================================================================
+OK   §1.1 d log(price) / d log(quantity), within pw          -0.1212  (doc -0.1212)
+      t = -500 on n = 1,037,081
+  price measure  FE elasticity      se  overstatement vs modal
+    price_modal        +1.5712 +0.0077                 +0.0000
+   price_median        +1.5550 +0.0078                 -0.0103
+price_unitvalue        +2.0041 +0.0076                 +0.2756
+OK   §1.1 FE elasticity, modal price                          1.5712  (doc 1.5712)
+OK   §1.1 FE elasticity, median price                         1.5550  (doc 1.555)
+OK   §1.1 FE elasticity, unit value                           2.0041  (doc 2.0041)
+OK   §1.1 unit-value overstatement [%]                       27.5566  (doc 27.6)
+
+============================================================================================
+§1.2  FEATURES
+============================================================================================
+modelling frame 180,233 x 33, 0 NaNs, 19 controls
+
+============================================================================================
+§1.3  CROSS-VALIDATION LEAKS
+============================================================================================
+             design  folds  median_n_train  median_n_valid  weeks_shared_train_valid  pct_valid_products_also_in_train
+ NaiveKFold (wrong)      5          144186           36047                       515                             100.0
+ RollingOriginSplit      5          103323           13983                         0                              97.2
+ PurgedRollingSplit      5           92943           14001                         0                              93.0
+GroupedProductSplit      5          144587           35646                       515                               0.0
+
+============================================================================================
+§2  WHY THE NAIVE REGRESSION FAILS
+============================================================================================
+
+--- theta=0.6, lam=0.8 ---
+                       channel  contribution
+          TRUE mean elasticity       +1.6560
+        product effect (alpha)       -0.0091
+           week effect (gamma)       -0.0027
+          baseline demand g(X)       -0.0514
+                  confounder u       -0.3117
+                residual noise       -0.0003
+      elasticity heterogeneity       -0.1169
+      = implied naive estimate       +1.1639
+     actual naive OLS estimate       +1.1639
+  identity check (should be 0)       +0.0000
+OK   §2   [theta=0.6, lam=0.8] confounder u                  -0.3117  (doc -0.3117)
+OK   §2   [theta=0.6, lam=0.8] elasticity heterogeneity      -0.1169  (doc -0.1169)
+OK   §2   [theta=0.6, lam=0.8]   actual naive OLS estimate     1.1639  (doc 1.1639)
+OK   §2   [theta=0.6, lam=0.8] true mean elasticity           1.6560  (doc 1.656)
+
+--- theta=0, lam=0 (control) ---
+                       channel  contribution
+          TRUE mean elasticity       +1.6560
+        product effect (alpha)       -0.0102
+           week effect (gamma)       -0.0018
+          baseline demand g(X)       +0.2934
+                  confounder u       -0.0000
+                residual noise       +0.0001
+      elasticity heterogeneity       -0.2952
+      = implied naive estimate       +1.6423
+     actual naive OLS estimate       +1.6423
+  identity check (should be 0)       +0.0000
+OK   §2   [theta=0, lam=0 (control)] confounder u            -0.0000  (doc 0.0)
+OK   §2   [theta=0, lam=0 (control)] elasticity heterogeneity    -0.2952  (doc -0.2952)
+OK   §2   [theta=0, lam=0 (control)]   actual naive OLS estimate     1.6423  (doc 1.6423)
+OK   §2   [theta=0, lam=0 (control)] true mean elasticity     1.6560  (doc 1.656)
+
+The claim the document makes: the heterogeneity channel is LARGER with the
+confounding switched off than with it on, so it is not a by-product of confounding.
+OK   |-0.2952| (no confounding) vs |-0.1169| (theta=0.6)
+
+============================================================================================
+§3.3  THREADING
+============================================================================================
+  n_jobs=  1:    0.34s   (100 trees, 23,996 rows)
+  n_jobs=  4:    0.31s   (100 trees, 23,996 rows)
+  n_jobs=  8:    0.27s   (100 trees, 23,996 rows)
+  n_jobs= -1:  149.24s   (100 trees, 23,996 rows)
+OK   n_jobs=-1 is 553x slower than n_jobs=8 (N_THREADS=8).  The document reports 340x on an idle 24-core host and 849x under load; the assertion is only that it exceeds 20x, because the absolute figure is machine- and load-dependent while the conclusion is not.
+
+============================================================================================
+§4-§5  ARTEFACTS FROM experiments/11_ AND 12_
+============================================================================================
+  present   11_objective_comparison.csv
+  present   11_objective_rank_correlation.csv
+  present   11_trial_histories.parquet
+  present   12_synthetic_full_battery.csv
+  present   12_real_full_battery.csv
+  present   12_metric_selection_power.csv
+  present   12_robustness_across_worlds.csv
+
+============================================================================================
+28/28 checks passed
+every documented number reproduces

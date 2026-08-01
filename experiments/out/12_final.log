@@ -1,0 +1,156 @@
+threads=8 n_products=900 n_trials=15
+
+=== tuning on the semi-synthetic panel (R-loss objective) ===
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  pooled_loglog        rloss=0.8327 vs-const=-0.0761 [9s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  twoway_fe            rloss=0.8283 vs-const=-0.0704 [25s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  poisson_glm          rloss=0.8264 vs-const=-0.0648 [276s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  lgbm_demand          rloss=0.8778 vs-const=-0.1281 [130s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  dml_partialling      rloss=0.8096 vs-const=-0.0452 [492s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  r_learner            rloss=0.7858 vs-const=-0.0178 [428s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  shrunk_per_product   rloss=0.8291 vs-const=-0.0755 [80s]
+
+==============================================================================================================
+SEMI-SYNTHETIC — every metric, including the oracle columns the real panel lacks
+==============================================================================================================
+              name  avg_elasticity  blp_avg_elasticity  eps_sd    rmse      r2  rloss_skill  rloss_vs_constant   beta1  beta1_t  heterogeneity_detected gates_monotone  gates_spread  gates_spread_t  value_model  value_best_uniform  lift_over_uniform  pct_priced_up  oracle_rmse  oracle_bias  oracle_corr  share_of_mse_from_bias
+       poisson_glm         +1.6712             +1.3434 +0.0000 +2.1342 +0.1596      +0.2235            -0.0186     NaN      NaN                   False           None           NaN             NaN      +0.0172             +0.0172            +0.0000        +0.0000      +0.7201      -0.0319          NaN                 +0.0020
+   dml_partialling         +1.5325             +1.3434 +0.0000 +0.8642 +0.8622      +0.2329            -0.0062     NaN      NaN                   False           None           NaN             NaN      +0.0172             +0.0172            +0.0000        +0.0000      +0.7393      -0.1705          NaN                 +0.0532
+         r_learner         +1.3674             +1.2491 +0.4996 +0.8076 +0.8796      +0.2473            +0.0127 -0.7146  -8.5233                    True           True       +0.8825         +6.6838      +0.0183             +0.0142            +0.0041        +0.1678      +0.7514      -0.3356      +0.4385                 +0.1995
+     pooled_loglog         +1.0967             +1.3434 +0.0000 +2.0597 +0.2173      +0.2296            -0.0105     NaN      NaN                   False           None           NaN             NaN      +0.0172             +0.0172            +0.0000        +0.0000      +0.9409      -0.6064          NaN                 +0.4154
+         twoway_fe         +1.0894             +1.3434 +0.0000 +0.7890 +0.8852      +0.2291            -0.0111     NaN      NaN                   False           None           NaN             NaN      +0.0172             +0.0172            +0.0000        +0.0000      +0.9455      -0.6136          NaN                 +0.4212
+       lgbm_demand         +0.7907             +1.2388 +0.5384 +0.9194 +0.8440      +0.2237            -0.0182 -0.5298  -6.9471                    True           True       +0.7853         +5.1320      +0.0044             +0.0129            -0.0085        +0.6849      +1.1192      -0.9124      +0.4998                 +0.6645
+shrunk_per_product         +0.6863             +1.1769 +0.4984 +1.2878 +0.6940      +0.2400            +0.0031 -0.9710 -12.5509                    True           True       +1.4547        +10.3265      +0.0087             +0.0096            -0.0009        +0.7879      +1.1453      -1.0168      +0.6804                 +0.7881
+
+==============================================================================================================
+WHICH OBSERVABLE METRIC RANKS MODELS THE WAY THE TRUTH DOES?
+(Spearman with oracle_rmse, sign-flipped so that + means 'agrees with the truth')
+==============================================================================================================
+observable metric  n_models  rho with oracle_rmse
+lift_over_uniform         7               +0.6699
+             rmse         7               -0.1786
+               r2         7               -0.1786
+      rloss_skill         7               -0.1786
+rloss_vs_constant         7               -0.1786
+
+==============================================================================================================
+DOES THE RANKING SURVIVE A DIFFERENT DATA-GENERATING PROCESS?
+==============================================================================================================
+  exogenous price done
+  mild confounding done
+  heavy confounding done
+  poisson outcome done
+
+bias by world (untuned defaults):
+world               exogenous price  heavy confounding  mild confounding  poisson outcome
+model                                                                                    
+dml_partialling             +0.0808            -0.1715           -0.1128          -0.4587
+lgbm_demand                 +0.0793            -0.6803           -0.7018          -0.8995
+poisson_glm                 +0.1443            -0.5139           -1.1612          -1.1862
+pooled_loglog               +0.0782            -0.8133           -0.8143          -1.0168
+r_learner                   -0.0357            -0.3407           -0.2665          -0.5723
+shrunk_per_product          +0.2849            -1.1445           -1.1958          -1.3033
+twoway_fe                   +0.1752            -0.8314           -1.4482          -1.4716
+
+rank by oracle RMSE within each world (1 = best):
+world               exogenous price  heavy confounding  mild confounding  poisson outcome
+model                                                                                    
+dml_partialling                   3                  1                 1                1
+lgbm_demand                       6                  6                 3                3
+poisson_glm                       4                  2                 4                4
+pooled_loglog                     2                  3                 2                2
+r_learner                         7                  7                 7                7
+shrunk_per_product                1                  5                 5                5
+twoway_fe                         5                  4                 6                6
+
+=== tuning on the REAL panel (R-loss objective) ===
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  pooled_loglog        rloss=2.1732 vs-const=-0.0155 [8s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  twoway_fe            rloss=2.1748 vs-const=-0.0162 [29s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  poisson_glm          rloss=2.1765 vs-const=-0.0165 [192s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  lgbm_demand          rloss=2.3978 vs-const=-0.1403 [149s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  dml_partialling      rloss=2.1790 vs-const=-0.0189 [389s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  r_learner            rloss=2.1705 vs-const=-0.0151 [453s]
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+/home/gpu-user/ml/elasticity_lab/tuning.py:324: ExperimentalWarning: Argument ``group`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.TPESampler(seed=seed, multivariate=True, group=True)
+  shrunk_per_product   rloss=2.1743 vs-const=-0.0154 [9s]
+
+==============================================================================================================
+REAL PANEL — no ground truth; these are the numbers you would actually report
+==============================================================================================================
+              name  avg_elasticity  blp_avg_elasticity  eps_sd    rmse      r2  rloss_skill  rloss_vs_constant    beta1  beta1_t  heterogeneity_detected gates_monotone  gates_spread  gates_spread_t  value_model  value_best_uniform  lift_over_uniform  pct_priced_up
+         r_learner         +1.3047             +1.3532 +0.4133 +0.9361 +0.7013      +0.1443            +0.0018  -0.6239  -3.5268                    True          False       +0.7563         +3.2188      +0.0183             +0.0186            -0.0003        +0.2058
+   dml_partialling         +1.4139             +1.2839 +0.0000 +0.9100 +0.7176      +0.1413            -0.0017      NaN      NaN                   False           None           NaN             NaN      +0.0142             +0.0142            +0.0000        +0.0000
+       poisson_glm         +1.4296             +1.2839 +0.0000 +1.0945 +0.5916      +0.1409            -0.0021      NaN      NaN                   False           None           NaN             NaN      +0.0142             +0.0142            +0.0000        +0.0000
+     pooled_loglog         +1.4912             +1.2839 +0.0000 +0.9242 +0.7087      +0.1390            -0.0043      NaN      NaN                   False           None           NaN             NaN      +0.0142             +0.0142            +0.0000        +0.0000
+shrunk_per_product         +1.5258             +1.2951 +0.0034 +1.1477 +0.5509      +0.1378            -0.0058 -20.9595  -2.2182                    True          False       +0.3660         +2.4074      +0.0150             +0.0150            +0.0000        +0.0000
+         twoway_fe         +1.5439             +1.2839 +0.0000 +0.9539 +0.6898      +0.1369            -0.0068      NaN      NaN                   False           None           NaN             NaN      +0.0142             +0.0142            +0.0000        +0.0000
+       lgbm_demand         +1.9285             +1.2963 +1.1937 +1.1795 +0.5256      +0.0441            -0.1150  -0.0198  -0.3901                   False          False       +0.0074         +0.0353      +0.0086             +0.0143            -0.0057        +0.2176
+
+==============================================================================================================
+THE SELECTION RULE APPLIED (checks 2-5 of docs/ELASTICITY_MODELS.md section 5.1)
+A constant-elasticity model failing 3-5 is not a mark against it: it never claimed
+heterogeneity.  The checks decide between models that DO make the claim.
+==============================================================================================================
+              name  2_beats_constant  3_blp_significant  4_gates_monotone  5_beats_flat_policy  checks_passed  avg_elasticity  eps_sd
+         r_learner              True               True             False                False              2         +1.3047 +0.4133
+shrunk_per_product             False               True             False                False              1         +1.5258 +0.0034
+     pooled_loglog             False              False             False                False              0         +1.4912 +0.0000
+       poisson_glm             False              False             False                False              0         +1.4296 +0.0000
+         twoway_fe             False              False             False                False              0         +1.5439 +0.0000
+   dml_partialling             False              False             False                False              0         +1.4139 +0.0000
+       lgbm_demand             False              False             False                False              0         +1.9285 +1.1937
+
+wrote experiments/out/12_*.csv|json
