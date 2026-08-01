@@ -317,6 +317,8 @@ docs/
   ELASTICITY.md  grading a price-elasticity model that has no labels to grade against
   ELASTICITY_TUTORIAL.md   the same, built up on a 900-customer worked example
   ELASTICITY_MODELS.md     elasticity models on real observational data; HPO as the problem
+  MODELS.md      every estimator, objective and metric defined symbol by symbol
+  PLAN_PRICETEST_MODELS.md  planned: price-level classifiers, the VUS link, two-stage models
   IDEAS_LOG.md   every idea tried, the dead ends, the bugs, the measurements
   REFERENCES.md  annotated bibliography
 experiments/     validation suite, demos, threshold case study
