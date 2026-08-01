@@ -268,7 +268,99 @@ invisible** — the experiment cannot detect a personalisation gain below roughl
 Lerner rule was discretised onto the three prices the test actually ran; a real deployment
 would price on a continuum, where the GLM's ranking (corr 0.84) has more room to pay.
 
-## 6. Status
+## 6. Widening the arms, and grading on profit
+
+`experiments/19_arm_width_and_profit.py`. 300,000 quotes per design.
+
+### 6.1 Squared error is the wrong loss, in principle
+
+The optimal price moves with the elasticity at rate $-c/(\varepsilon-1)^2$ and profit is
+locally quadratic at its optimum, so the regret from an error scales as
+$(\Delta\varepsilon)^2/(\varepsilon-1)^4$. Normalising at $\varepsilon = 3$:
+
+| ε | 1.05 | 1.10 | 1.20 | 1.50 | 2.00 | 3.00 | 6.00 |
+|---|---|---|---|---|---|---|---|
+| relative cost of a unit error | **2,560,000** | 160,000 | 4,096 | 256 | 16 | 1 | 0.04 |
+
+Squared error treats every column alike; the decision does not. And 22% of this book sits
+*below* $\varepsilon = 1$, where the Lerner price is undefined — those rows need a cap, not
+a better estimate.
+
+### 6.2 Arm width buys a lot — for the nonparametric models only
+
+RMSE against the true elasticity at control:
+
+| model | ±5% | ±10% | ±20% | ±30% | ±50% |
+|---|---|---|---|---|---|
+| `conversion_glm` | 0.899 | 0.856 | 0.748 | 0.741 | 0.751 |
+| `glm_then_gbm` | 0.901 | 0.858 | 0.751 | 0.745 | 0.755 |
+| `conversion_gbm` | 1.228 | 1.164 | 1.073 | 1.042 | 1.023 |
+| `arm_posterior` | 2.518 | 1.473 | 0.912 | **0.752** | 0.828 |
+| `tlearner` | 2.903 | 1.524 | 0.867 | **0.714** | 0.825 |
+
+**The GLM's rank correlation is flat at 0.835 across the entire range** (0.838 at ±5%, 0.833
+at ±50%). Being correctly specified and pooling all three arms, it has already extracted
+everything at ±5% and wider arms tell it nothing new. The nonparametric models go from
+useless to best: `tlearner` climbs 0.236 → 0.890 and **overtakes the GLM at about ±30%**.
+
+**±50% is worse than ±30%** for both arm-based methods — at that width the dear arm converts
+so rarely that the choice-based sample thins out. There is an interior optimum, and on this
+book it is near ±30%.
+
+### 6.3 …but personalisation still is not detectable, and the flat gain grows faster
+
+Lift over the best flat policy, in standard errors:
+
+| model | ±5% | ±10% | ±20% | ±30% | ±50% |
+|---|---|---|---|---|---|
+| `conversion_glm` | −0.23 | +0.06 | +0.74 | **+1.17** | +1.14 |
+| `tlearner` | −3.30 | −1.39 | −0.47 | +1.15 | +1.28 |
+
+Widening moves it from invisible to *suggestive*, but even at ±30% no model clears two
+standard errors. Meanwhile:
+
+| | ±5% | ±10% | ±20% | ±30% | ±50% |
+|---|---|---|---|---|---|
+| best **flat** profit/quote | 81.64 | 86.20 | 91.68 | 94.18 | **98.20** |
+| test cost/quote | 0.10 | 0.55 | 2.16 | 4.89 | 14.18 |
+
+Against control at 75.41, a wider test is worth far more for **finding the right level** —
++30% by ±50% — than for enabling targeting. The same conclusion as §5, now with the
+experiment design as the lever.
+
+### 6.4 Fix the allocation before widening the arms
+
+The cheapest finding here. At ±10%:
+
+| allocation | eps RMSE | regret | lift (se) | effective quotes | test cost |
+|---|---|---|---|---|---|
+| 0.1 / 0.8 / 0.1 | 0.856 | 6.73 | +0.06 | 9,626 | 0.56 |
+| **0.2 / 0.6 / 0.2** | **0.730** | **3.54** | −0.07 | 19,118 | 1.25 |
+| balanced | 0.758 | 4.28 | +0.50 | 30,131 | 2.02 |
+
+**0.2/0.6/0.2 at ±10% beats 0.1/0.8/0.1 at ±30% on regret (3.54 vs 3.83) at a quarter of the
+cost (1.25 vs 4.89).** Rebalancing is a far cheaper way to buy the same information than
+widening, because the loss from a mispriced quote grows with the square of the mispricing
+while the information grows roughly linearly.
+
+### 6.5 Does the profit loss change the answer?
+
+Mostly not, and this is a negative result about my own proposal. Comparing the model
+*ranking* by squared error against the ranking by regret:
+
+| arm width | best by ε-RMSE | best by regret | ρ | agree |
+|---|---|---|---|---|
+| ±5% / ±10% / ±20% | `conversion_glm` | `conversion_glm` | 0.90 | ✓ |
+| ±30% | `tlearner` | `tlearner` | 1.00 | ✓ |
+| ±50% | `conversion_glm` | `glm_then_gbm` | 0.60 | ✗ |
+
+The two losses pick the same model at four widths out of five. So the
+$(\varepsilon-1)^{-4}$ weighting is **not** worth the complexity for *model selection* here.
+Where it should still matter is *within* a model — tuning, and deciding which customers to
+spend capacity on — because that is where the 2,560,000:1 ratio in §6.1 actually bites. That
+has not been tested and should not be claimed.
+
+## 7. Status
 
 The simulator, the model set, the decision layer and the diagnostics are in
 `elasticity_lab/insurance.py`. This document records

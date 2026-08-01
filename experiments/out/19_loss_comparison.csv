@@ -1,0 +1,6 @@
+arm_width,best_by_eps_rmse,best_by_regret,best_by_profit,"rho(eps_rmse, regret)",agree
+0.05,conversion_glm,conversion_glm,conversion_glm,0.9,True
+0.1,conversion_glm,conversion_glm,conversion_glm,0.9,True
+0.2,conversion_glm,conversion_glm,conversion_glm,0.9,True
+0.3,tlearner,tlearner,conversion_gbm,1.0,True
+0.5,conversion_glm,glm_then_gbm,tlearner,0.6,False

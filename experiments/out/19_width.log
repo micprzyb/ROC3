@@ -1,0 +1,101 @@
+================================================================================================================
+0.  WHERE ELASTICITY ACCURACY ACTUALLY MATTERS
+================================================================================================================
+ elasticity  relative cost of a unit error
+        1.1                    2,560,000.0
+        1.1                      160,000.0
+        1.2                        4,096.0
+        1.5                          256.0
+        2.0                           16.0
+        2.5                            3.2
+        3.0                            1.0
+        4.0                            0.2
+        6.0                            0.0
+
+  Normalised so eps = 3 is 1.0.  Squared error treats every row in this table alike; the
+  decision does not.  Note also that 22% of this book sits BELOW eps = 1, where the model
+  says 'charge more' without bound and the Lerner price is undefined -- those rows need a
+  cap, not a better estimate.
+================================================================================================================
+1.  ARM WIDTH: INFORMATION BOUGHT, AND WHAT IT COSTS
+================================================================================================================
+  width +/-5% done   (test costs +0.10/quote, +0.1% of control profit)
+  width +/-10% done   (test costs +0.55/quote, +0.7% of control profit)
+  width +/-20% done   (test costs +2.16/quote, +2.9% of control profit)
+  width +/-30% done   (test costs +4.89/quote, +6.5% of control profit)
+  width +/-50% done   (test costs +14.18/quote, +18.9% of control profit)
+
+--- elasticity accuracy by arm width ---
+arm_width       0.05  0.10  0.20  0.30  0.50
+model                                       
+arm_posterior  2.518 1.473 0.912 0.752 0.828
+conversion_gbm 1.228 1.164 1.073 1.042 1.023
+conversion_glm 0.899 0.856 0.748 0.741 0.751
+glm_then_gbm   0.901 0.858 0.751 0.745 0.755
+tlearner       2.903 1.524 0.867 0.714 0.825
+
+--- rank correlation with the truth ---
+arm_width       0.05  0.10  0.20  0.30  0.50
+model                                       
+arm_posterior  0.232 0.439 0.719 0.819 0.878
+conversion_gbm 0.463 0.502 0.577 0.602 0.609
+conversion_glm 0.838 0.837 0.837 0.835 0.833
+glm_then_gbm   0.836 0.835 0.834 0.832 0.828
+tlearner       0.236 0.480 0.753 0.841 0.890
+
+--- PROFIT REGRET per quote (the loss that matters; lower is better) ---
+arm_width        0.05   0.10  0.20  0.30  0.50
+model                                         
+arm_posterior  32.824 18.676 7.932 4.739 6.405
+conversion_gbm  8.747  7.379 5.761 5.333 4.891
+conversion_glm  7.818  6.728 4.001 3.830 4.071
+glm_then_gbm    7.837  6.780 4.102 3.901 4.070
+tlearner       18.801  9.393 4.490 3.735 6.094
+
+--- lift over the best FLAT policy, in standard errors ---
+arm_width        0.05   0.10   0.20  0.30  0.50
+model                                          
+arm_posterior  -3.831 -3.043 -0.431 0.595 0.605
+conversion_gbm -0.418 -0.255  0.066 1.150 1.110
+conversion_glm -0.231  0.055  0.744 1.169 1.138
+glm_then_gbm   -0.394 -0.199  0.586 1.044 1.142
+tlearner       -3.298 -1.392 -0.467 1.153 1.276
+
+--- what the test costs ---
+           test_cost_per_quote  best_flat
+arm_width                                
+0.05                     0.097     81.640
+0.10                     0.555     86.195
+0.20                     2.156     91.680
+0.30                     4.887     94.182
+0.50                    14.177     98.202
+
+================================================================================================================
+2.  SQUARED ERROR vs PROFIT REGRET: DO THEY RANK MODELS THE SAME WAY?
+================================================================================================================
+ arm_width best_by_eps_rmse best_by_regret best_by_profit  rho(eps_rmse, regret)  agree
+     0.050   conversion_glm conversion_glm conversion_glm                  0.900   True
+     0.100   conversion_glm conversion_glm conversion_glm                  0.900   True
+     0.200   conversion_glm conversion_glm conversion_glm                  0.900   True
+     0.300         tlearner       tlearner conversion_gbm                  1.000   True
+     0.500   conversion_glm   glm_then_gbm       tlearner                  0.600  False
+
+================================================================================================================
+3.  IS IT THE WIDTH OR THE ALLOCATION?
+================================================================================================================
+  0.1/0.8/0.1 (live test)  w=10% done
+  0.1/0.8/0.1 (live test)  w=30% done
+  0.2/0.6/0.2              w=10% done
+  0.2/0.6/0.2              w=30% done
+  balanced                 w=10% done
+  balanced                 w=30% done
+
+             allocation  arm_width  eps_rmse  regret  lift_in_se        ess  test_cost
+0.1/0.8/0.1 (live test)      0.100     0.856   6.728       0.055  9,626.292      0.555
+0.1/0.8/0.1 (live test)      0.300     0.741   3.830       1.169 11,522.410      4.887
+            0.2/0.6/0.2      0.100     0.730   3.539      -0.069 19,118.322      1.250
+            0.2/0.6/0.2      0.300     0.743   3.948       1.008 21,634.953      9.812
+               balanced      0.100     0.758   4.281       0.503 30,131.000      2.024
+               balanced      0.300     0.762   4.433       1.487 30,248.000     16.186
+
+wrote experiments/out/19_*.csv

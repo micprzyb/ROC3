@@ -51,7 +51,8 @@ __all__ = ["MotorQuoteConfig", "make_quote_panel", "QUOTE_FEATURES",
            "ArmPosteriorModel", "profit_curve", "optimal_price", "policy_profit",
            "realised_elasticity_by_bin", "arm_posterior_constraint_check",
            "to_balanced_gauge", "constraint_triangle_vertices", "GLMThenGBM",
-           "MOTOR_MODELS", "true_conversion_matrix"]
+           "MOTOR_MODELS", "true_conversion_matrix", "profit_regret",
+           "profit_weight", "lerner_price", "experiment_cost"]
 
 
 # =======================================================================================
@@ -804,3 +805,107 @@ class GLMThenGBM(ConversionModel):
 
 MOTOR_MODELS = {m.name: m for m in (ConversionGLM, ConversionGBM, TLearnerConversion,
                                     ArmPosteriorModel, GLMThenGBM)}
+
+
+# =======================================================================================
+# the profit-weighted objective
+# =======================================================================================
+def lerner_price(eps: np.ndarray, cost: np.ndarray, *, price0=None,
+                 lo: float = 0.5, hi: float = 2.0) -> np.ndarray:
+    """``p* = c * eps / (eps - 1)`` — the Lerner price for a *given* elasticity.
+
+    Treats ``eps`` as fixed rather than re-solving the implicit equation, which is what a
+    practitioner does when the model reports one elasticity per customer.  Where
+    ``eps <= 1`` there is no interior optimum and the price is capped at ``hi * price0``.
+    """
+    eps = np.asarray(eps, float)
+    c = np.asarray(cost, float)
+    p0 = c if price0 is None else np.asarray(price0, float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        p = np.where(eps > 1.0 + 1e-9, c * eps / (eps - 1.0), hi * p0)
+    return np.clip(np.nan_to_num(p, nan=hi * p0), lo * p0, hi * p0)
+
+
+def profit_weight(eps: np.ndarray) -> np.ndarray:
+    """How much a unit of elasticity error costs, up to a common factor: ``(eps-1)^-4``.
+
+    The optimal price moves with the elasticity at rate
+
+        dp*/d eps  =  -c / (eps - 1)^2
+
+    and profit is locally quadratic around its optimum, so the regret from an error
+    ``d eps`` scales as ``(d eps)^2 / (eps - 1)^4``.  The exponent is not a typo, and the
+    consequence is severe: an error at ``eps = 1.5`` costs **256 times** what the same error
+    costs at ``eps = 3``.
+
+    This is why squared error in the elasticity is the wrong loss for a pricing model.  It
+    spends its effort where the elasticity is large and the answer barely matters, and
+    ignores the near-unit-elasticity customers where the price recommendation swings
+    wildly.  Use :func:`profit_regret` to grade, and the IPW policy value to tune.
+    """
+    eps = np.asarray(eps, float)
+    return 1.0 / np.maximum(np.abs(eps - 1.0), 1e-3) ** 4
+
+
+def profit_regret(d: pd.DataFrame, eps_hat: np.ndarray, *, price0=None,
+                  reduce: str = "mean") -> dict:
+    """Oracle regret: the profit given up by pricing on ``eps_hat`` instead of the truth.
+
+        regret_i  =  pi_i(p*(eps_i))  -  pi_i(p*(eps_hat_i))
+
+    with the true conversion curve for ``pi_i``, so this is exact rather than estimated.
+    It is the **grader** — available only in simulation — and the thing every observable
+    objective is trying to approximate.
+
+    Unlike squared error it is asymmetric and scale-aware: it is near zero wherever the
+    price recommendation is insensitive to the elasticity, and large wherever it is not.
+    """
+    a = d["_a"].to_numpy(float)
+    beta = d["true_beta"].to_numpy(float)
+    c = d["claims_cost"].to_numpy(float)
+    p0 = np.exp(d["log_technical_premium"].to_numpy(float)) if price0 is None \
+        else np.asarray(price0, float)
+
+    def true_profit(p):
+        s = 1.0 / (1.0 + np.exp(-(a - beta * np.log(p))))
+        return s * (p - c)
+
+    eps_true = d["true_elasticity_control"].to_numpy(float)
+    p_opt = lerner_price(eps_true, c, price0=p0)
+    p_hat = lerner_price(np.asarray(eps_hat, float), c, price0=p0)
+    reg = true_profit(p_opt) - true_profit(p_hat)
+    out = {"regret_mean": float(reg.mean()), "regret_median": float(np.median(reg)),
+           "regret_p90": float(np.percentile(reg, 90)),
+           "profit_at_oracle": float(true_profit(p_opt).mean()),
+           "profit_at_model": float(true_profit(p_hat).mean()),
+           "pct_of_oracle_profit": float(true_profit(p_hat).mean()
+                                         / max(true_profit(p_opt).mean(), 1e-9))}
+    if reduce == "all":
+        out["regret"] = reg
+    return out
+
+
+def experiment_cost(d: pd.DataFrame, *, reference: str = "control") -> dict:
+    """What the price test itself costs, per quote.
+
+    Widening the arms buys statistical power and is not free: the cheap arm is deliberately
+    underpriced and the dear arm deliberately overpriced, and the traffic sent there earns
+    less than it would at the reference price.  A test design is a trade between the
+    information gained and this, and quoting the first without the second is not a
+    business case.
+
+    ``reference`` is what you would otherwise have charged everyone — ``"control"``, or
+    ``"best_flat"`` for the best of the three arms as measured.
+    """
+    arm = d["arm"].to_numpy()
+    pi = np.asarray(d.attrs["arm_probs"], float)
+    mult = np.asarray(d.attrs["arm_multipliers"], float)
+    price = np.exp(d["log_technical_premium"].to_numpy(float))
+    profit = d["converted"].to_numpy() * (price * mult[arm] - d["claims_cost"].to_numpy())
+    by_arm = np.array([profit[arm == k].mean() for k in range(len(mult))])
+    ref = by_arm[len(mult) // 2] if reference == "control" else by_arm.max()
+    realised = float((pi * by_arm).sum())
+    return {"profit_by_arm": by_arm, "reference_profit": float(ref),
+            "realised_profit": realised,
+            "cost_per_quote": float(ref - realised),
+            "cost_pct": float((ref - realised) / max(abs(ref), 1e-9))}
