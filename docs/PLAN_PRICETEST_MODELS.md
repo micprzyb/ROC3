@@ -289,6 +289,66 @@ Stated now, before implementation, so they can fail.
 **P3 is the one that answers the user's question**, and P1/P2 are what make P3 interpretable.
 P4 is a correctness test on the implementation.
 
+### 4.5 RESULTS — including one prediction that failed
+
+Run in `experiments/16_gauge_and_pricelevels.py`, `17_vus_elasticity_link.py` and
+`17b_p3_power_check.py`, on a **randomised price test** built over the real covariates
+(`simulate.make_price_test_panel`), scored out of sample.
+
+| | verdict | evidence |
+|---|---|---|
+| **P4** gauge | **CONFIRMED, exactly** | 3AFC VUS changed by `0.0e+00` — bit-for-bit — while the arc elasticities moved by up to **2.846**, matching the predicted shift to `2e-14`. (The *geometric* VUS wobbles by 3e-6: it integrates over a finite weight grid, which is its documented `O(1/R)` behaviour, not a violation.) |
+| **P1** homogeneous ⇒ chance | **CONFIRMED** | With all three heterogeneity terms off (`true_sd = 0.0000`), VUS = **0.1764** against chance 0.1667. |
+| **P5** ceiling ≥ VUS | **CONFIRMED** | Every out-of-sample verdict "plausible"; the ceiling rises monotonically with the elasticity *level* — 0.191, 0.197, 0.227, 0.249, 0.283 for mean ε of 0, 0.5, 1, 1.66, 2.5. |
+| **P2** VUS_norm ↑ with heterogeneity | **NOT SUPPORTED** | The apparent monotone trend was noise; see P3. |
+| **P3** VUS_norm tracks `oracle_corr` | **REFUTED** | ρ = −0.358, and −0.57 / −0.87 in the corrected test. |
+
+**A design error in my own test, found and fixed.** The first P2/P3 sweeps varied
+`elasticity_sd`, which adds an independent random draw per product. The controls hold only
+coarse product summaries and do not identify the product, so that draw is **invisible to any
+classifier**. It inflates the target's variance without giving VUS anything to find.
+`SyntheticConfig.elasticity_size_slope` was added so all three heterogeneity terms can be
+switched off, and the sweep re-run over `elasticity_price_slope`, which makes the elasticity
+a deterministic function of an *observed* control and so is learnable in principle.
+
+**The corrected test refutes P3 decisively.** As the learnable heterogeneity rises
+(`true_sd` 0 → 1.07):
+
+| arms | `oracle_corr` | VUS |
+|---|---|---|
+| ±10% | 0.22 → 0.37 → **0.51** | 0.1776 → 0.1748 → 0.1742 |
+| ±50% | 0.59 → 0.80 → **0.91** | 0.1761 → 0.1750 → 0.1728 |
+
+**The model recovers the heterogeneity beautifully — correlation 0.91 — while VUS does not
+move at all** (span 0.006). ρ(VUS_norm, `oracle_corr`) = −0.57 and −0.87.
+
+**Why, and what it means for §4.3.** A single sold unit's arm label carries almost no
+information when arms are randomised: even perfect knowledge of ε(x) only moves the
+posterior from (⅓,⅓,⅓) to about (0.56, 0.28, 0.19). So the *Bayes-optimal* VUS in a
+realistic world sits near chance regardless of how well the elasticity is known. The ceiling
+from `vus_ceiling` is a bound over **all worlds** with the given prevalences — attained only
+if some customers are near-certain cheap-arm and others near-certain dear-arm — and no
+plausible demand system does that. **So `normalized_vus` is not "the fraction of achievable
+heterogeneity recovered", and §4.3's recommendation to report it is withdrawn.** It
+normalises by a bound that is not tight.
+
+### 4.6 The answer to the question, as measured
+
+> **VUS is a poor instrument for judging an elasticity model, and the failure is structural
+> rather than fixable.**
+
+* It is **provably blind to the level** — a theorem (§4.1), confirmed to machine precision.
+  The gauge that leaves VUS exactly invariant moves the elasticity arbitrarily.
+* It is **empirically insensitive to the heterogeneity** — measured, not argued: recovery
+  correlation 0.21 → 0.91 with VUS flat to within 0.006.
+* The ceiling machinery remains genuinely useful, but for a **different job**: as a
+  *leakage detector*. It flagged in-sample scoring (VUS 0.53 against a ceiling of 0.25) and
+  the observational panel's positivity violation (0.89 against 0.29) as "impossible" without
+  being told to look, and both were real defects.
+
+Use `rloss_vs_constant`, the BLP `beta1_t` with `implied_spread`, and `lift_over_uniform`
+(`MODELS.md` §5) to judge an elasticity model. Use the VUS ceiling to catch cheating.
+
 ---
 
 ## 5. Research: two-stage residual models

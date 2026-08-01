@@ -62,7 +62,8 @@ import pandas as pd
 from .features import CONTROL_FEATURES, add_features
 
 __all__ = ["SyntheticConfig", "make_synthetic_panel", "theoretical_ols_bias",
-           "naive_bias_decomposition", "elasticity_recovery_metrics"]
+           "naive_bias_decomposition", "elasticity_recovery_metrics",
+           "make_price_test_panel"]
 
 
 @dataclass
@@ -80,6 +81,11 @@ class SyntheticConfig:
     #: how strongly elasticity depends on the product's price level (negative = cheap
     #: products are more elastic).
     elasticity_price_slope: float = -0.45
+    #: how strongly elasticity depends on the product's typical order size.  Set this,
+    #: `elasticity_sd` AND `elasticity_price_slope` to zero for a genuinely HOMOGENEOUS
+    #: world -- zeroing only `elasticity_sd` still leaves these two structural terms, and
+    #: the resulting sd of 0.47 is not "no heterogeneity".
+    elasticity_size_slope: float = 0.20
     #: residual noise on log quantity.
     noise_sd: float = 0.45
     #: multiplier on the nonlinear part of baseline demand g(X).
@@ -164,7 +170,7 @@ def make_synthetic_panel(panel: pd.DataFrame, cfg: SyntheticConfig | None = None
         sz=("lag_n_lines", "mean"))
     eps = (cfg.elasticity_mean
            + cfg.elasticity_price_slope * _standardise(prod.pm.to_numpy(float))
-           + 0.20 * _standardise(np.log1p(prod.sz.to_numpy(float)))
+           + cfg.elasticity_size_slope * _standardise(np.log1p(prod.sz.to_numpy(float)))
            + cfg.elasticity_sd * rng.standard_normal(len(prod)))
     eps = np.clip(eps, 0.15, 4.0)
     prod_eps = pd.Series(eps, index=prod.index, name="true_elasticity")
@@ -304,3 +310,107 @@ def elasticity_recovery_metrics(pred: np.ndarray, true: np.ndarray) -> dict:
         "spearman": float(spearmanr(pred, true).statistic) if np.std(pred) > 1e-9 else float("nan"),
         "n": int(len(pred)),
     }
+
+
+# =======================================================================================
+# a genuine randomised price test
+# =======================================================================================
+def make_price_test_panel(panel: pd.DataFrame, cfg: SyntheticConfig | None = None, *,
+                          price_multipliers=(0.9, 1.0, 1.1), seed: int | None = None,
+                          price_col: str = "price_modal") -> pd.DataFrame:
+    """A **randomised price test** on real covariates — the user's original example.
+
+    Everything in :func:`make_synthetic_panel` is observational: the seller chose the
+    price, so it correlates with demand and the whole difficulty is undoing that.  This
+    function builds the other world.  Each product-week is assigned an **arm** uniformly at
+    random, and the price is the product's own base price times that arm's multiplier:
+
+        log p_it  =  prod_log_price_mean_i  +  log(multiplier[arm_it])
+
+    Three consequences, all of which matter:
+
+    * the arm is **independent of X by construction**, so the propensity is exactly
+      ``1/K`` and there is no confounding left to remove;
+    * **overlap is perfect** — every covariate value has every arm available, which is
+      precisely what the observational panel does not have (there, the seller's price is so
+      predictable from its own recent history that inverse-propensity weighting collapses);
+    * the arm posterior among sold units **is** the demand curve, normalised, so
+      :class:`elasticity_lab.pricelevels.PriceLevelClassifier` is exactly the right model
+      and `roc3`'s VUS machinery applies unmodified.
+
+    ``price_multipliers`` defaults to the −10% / 0% / +10% of the motivating example.  Note
+    how little room that leaves: at an elasticity of 1.66 the cheapest and dearest arms
+    differ in demand by only a factor of 1.4, which caps the attainable VUS at about 0.26
+    (:func:`roc3.pricetest.ceiling_from_elasticity`).  A raw VUS of 0.25 on this task is
+    close to perfect, and that is why the raw number must never be reported alone.
+
+    Extra columns beyond :func:`make_synthetic_panel`: ``arm`` (0-based, cheapest first),
+    ``arm_log_multiplier``, and ``true_arm_prob`` (``1/K``, the known assignment
+    probability — the thing randomisation buys you).
+    """
+    cfg = cfg or SyntheticConfig()
+    rng = np.random.default_rng(cfg.seed if seed is None else seed)
+    mult = np.asarray(price_multipliers, dtype=float)
+    if np.any(np.diff(mult) <= 0) or np.any(mult <= 0):
+        raise ValueError("price_multipliers must be positive and increasing (cheapest first)")
+    K = len(mult)
+
+    d = add_features(panel, price_col=price_col).copy()
+    n = len(d)
+
+    # ---- true heterogeneous elasticity, one value per product (as in the observational twin)
+    prod = d.groupby("stock_code", observed=True).agg(
+        pm=("prod_log_price_mean", "first"),
+        wk=("prod_n_weeks", "first"),
+        sz=("lag_n_lines", "mean"))
+    eps = (cfg.elasticity_mean
+           + cfg.elasticity_price_slope * _standardise(prod.pm.to_numpy(float))
+           + cfg.elasticity_size_slope * _standardise(np.log1p(prod.sz.to_numpy(float)))
+           + cfg.elasticity_sd * rng.standard_normal(len(prod)))
+    eps = np.clip(eps, 0.15, 4.0)
+    prod_eps = pd.Series(eps, index=prod.index, name="true_elasticity")
+    d["true_elasticity"] = d["stock_code"].map(prod_eps).to_numpy(float)
+
+    # ---- the randomisation ---------------------------------------------------------------
+    arm = rng.integers(0, K, n)
+    d["arm"] = arm
+    d["arm_log_multiplier"] = np.log(mult)[arm]
+    d["true_arm_prob"] = 1.0 / K
+    d["log_price"] = d["prod_log_price_mean"].to_numpy(float) + d["arm_log_multiplier"]
+    d["log_price_exogenous"] = d["log_price"]
+    d["u_confounder"] = 0.0          # there is none; kept so the frames share a schema
+
+    # ---- outcome ---------------------------------------------------------------------------
+    alpha = pd.Series(rng.normal(0.0, 0.8, len(prod)), index=prod.index)
+    weeks = np.array(sorted(pd.unique(d["week"])))
+    gamma = pd.Series(rng.normal(0.0, 0.25, len(weeks)), index=weeks)
+    d["_dgp_alpha"] = d["stock_code"].map(alpha).to_numpy(float)
+    d["_dgp_gamma"] = d["week"].map(gamma).to_numpy(float)
+    d["_dgp_g"] = cfg.signal_strength * _nonlinear_baseline(d)
+    d["_dgp_u_term"] = 0.0
+    d["_dgp_noise"] = cfg.noise_sd * rng.standard_normal(n)
+    eta = (3.0 + d["_dgp_alpha"] + d["_dgp_gamma"] + d["_dgp_g"]
+           - d["true_elasticity"].to_numpy(float) * d["log_price"].to_numpy(float)
+           + d["_dgp_u_term"])
+
+    if cfg.outcome == "lognormal":
+        d["log_qty"] = eta + d["_dgp_noise"]
+        d["qty"] = np.exp(d["log_qty"])
+    elif cfg.outcome == "poisson":
+        lam = np.exp(np.clip(eta, -5, 12))
+        d["qty"] = np.maximum(rng.poisson(lam), 1)
+        d["log_qty"] = np.log(d["qty"])
+    else:
+        raise ValueError("outcome must be 'lognormal' or 'poisson'")
+
+    # the price changed, so its derived features must be rebuilt
+    d["rel_price"] = d["log_price"] - d["roll4_log_price"]
+    d["price_change"] = d["log_price"] - d["lag_log_price"]
+    d["is_discounted"] = (d["rel_price"] < -0.02).astype(float)
+
+    d.attrs["dgp"] = cfg.to_dict()
+    d.attrs["design"] = "randomised price test"
+    d.attrs["price_multipliers"] = mult.tolist()
+    d.attrs["K"] = K
+    d.attrs["true_elasticity_by_product"] = {k: float(v) for k, v in prod_eps.items()}
+    return d

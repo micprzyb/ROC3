@@ -1,0 +1,117 @@
+  +/-10% (the motivating test) sd=0.00 leaves=  8  vus=0.1787 ceil=0.2569 norm=+0.134 corr=+0.486
+  +/-10% (the motivating test) sd=0.00 leaves= 31  vus=0.1717 ceil=0.2482 norm=+0.062 corr=+0.258
+  +/-10% (the motivating test) sd=0.00 leaves=127  vus=0.1758 ceil=0.2270 norm=+0.151 corr=+0.058
+  +/-10% (the motivating test) sd=0.30 leaves=  8  vus=0.1773 ceil=0.2525 norm=+0.124 corr=+0.366
+  +/-10% (the motivating test) sd=0.30 leaves= 31  vus=0.1741 ceil=0.2522 norm=+0.087 corr=+0.239
+  +/-10% (the motivating test) sd=0.30 leaves=127  vus=0.1764 ceil=0.2342 norm=+0.143 corr=+0.049
+  +/-10% (the motivating test) sd=0.55 leaves=  8  vus=0.1769 ceil=0.2519 norm=+0.120 corr=+0.278
+  +/-10% (the motivating test) sd=0.55 leaves= 31  vus=0.1709 ceil=0.2478 norm=+0.052 corr=+0.256
+  +/-10% (the motivating test) sd=0.55 leaves=127  vus=0.1773 ceil=0.2288 norm=+0.171 corr=+0.065
+  +/-10% (the motivating test) sd=0.80 leaves=  8  vus=0.1787 ceil=0.2534 norm=+0.138 corr=+0.231
+  +/-10% (the motivating test) sd=0.80 leaves= 31  vus=0.1759 ceil=0.2492 norm=+0.112 corr=+0.183
+  +/-10% (the motivating test) sd=0.80 leaves=127  vus=0.1765 ceil=0.2219 norm=+0.177 corr=+0.086
+  +/-25%                       sd=0.00 leaves=  8  vus=0.1764 ceil=0.3880 norm=+0.044 corr=+0.821
+  +/-25%                       sd=0.00 leaves= 31  vus=0.1747 ceil=0.3696 norm=+0.039 corr=+0.500
+  +/-25%                       sd=0.00 leaves=127  vus=0.1773 ceil=0.3006 norm=+0.079 corr=+0.245
+  +/-25%                       sd=0.30 leaves=  8  vus=0.1790 ceil=0.3894 norm=+0.055 corr=+0.675
+  +/-25%                       sd=0.30 leaves= 31  vus=0.1758 ceil=0.3709 norm=+0.045 corr=+0.463
+  +/-25%                       sd=0.30 leaves=127  vus=0.1747 ceil=0.3153 norm=+0.054 corr=+0.239
+  +/-25%                       sd=0.55 leaves=  8  vus=0.1785 ceil=0.3809 norm=+0.055 corr=+0.517
+  +/-25%                       sd=0.55 leaves= 31  vus=0.1824 ceil=0.3714 norm=+0.077 corr=+0.425
+  +/-25%                       sd=0.55 leaves=127  vus=0.1755 ceil=0.3269 norm=+0.055 corr=+0.272
+  +/-25%                       sd=0.80 leaves=  8  vus=0.1767 ceil=0.3843 norm=+0.046 corr=+0.445
+  +/-25%                       sd=0.80 leaves= 31  vus=0.1757 ceil=0.3701 norm=+0.044 corr=+0.430
+  +/-25%                       sd=0.80 leaves=127  vus=0.1753 ceil=0.3258 norm=+0.055 corr=+0.277
+  +/-50%                       sd=0.00 leaves=  8  vus=0.1749 ceil=0.5872 norm=+0.019 corr=+0.897
+  +/-50%                       sd=0.00 leaves= 31  vus=0.1760 ceil=0.5672 norm=+0.023 corr=+0.733
+  +/-50%                       sd=0.00 leaves=127  vus=0.1769 ceil=0.4825 norm=+0.033 corr=+0.481
+  +/-50%                       sd=0.30 leaves=  8  vus=0.1766 ceil=0.5863 norm=+0.024 corr=+0.782
+  +/-50%                       sd=0.30 leaves= 31  vus=0.1738 ceil=0.5827 norm=+0.017 corr=+0.691
+  +/-50%                       sd=0.30 leaves=127  vus=0.1736 ceil=0.5038 norm=+0.021 corr=+0.478
+  +/-50%                       sd=0.55 leaves=  8  vus=0.1745 ceil=0.5771 norm=+0.019 corr=+0.649
+  +/-50%                       sd=0.55 leaves= 31  vus=0.1710 ceil=0.5748 norm=+0.011 corr=+0.649
+  +/-50%                       sd=0.55 leaves=127  vus=0.1772 ceil=0.4865 norm=+0.033 corr=+0.506
+  +/-50%                       sd=0.80 leaves=  8  vus=0.1753 ceil=0.5646 norm=+0.022 corr=+0.567
+  +/-50%                       sd=0.80 leaves= 31  vus=0.1728 ceil=0.5581 norm=+0.016 corr=+0.621
+  +/-50%                       sd=0.80 leaves=127  vus=0.1756 ceil=0.5050 norm=+0.026 corr=+0.557
+
+================================================================================================
+P3 BY ARM WIDTH
+================================================================================================
+                        arms  n  vus_span  mean_ceiling  rho(vus_norm, oracle_corr)  rho(vus_norm, |bias|)
++/-10% (the motivating test) 12   +0.0079       +0.2437                     -0.5734                +0.5175
+                      +/-25% 12   +0.0077       +0.3578                     -0.4126                +0.3287
+                      +/-50% 12   +0.0061       +0.5480                     -0.3776                +0.4965
+
+READING THIS
+
+  If `rho(vus_norm, oracle_corr)` turns positive as the arms widen, the original failure
+  was a power problem: at +/-10% the VUS signal is about 0.01 above chance and a rank
+  correlation over that is measuring noise.  The theory of PLAN section 4 is a theorem
+  either way -- the gauge argument does not depend on any of this -- but the empirical
+  corollary would then be "detectable only when the test is wide enough".
+
+  If it stays negative at every width, the corollary is wrong and must be withdrawn.
+
+  Either way, the practical advice is unchanged and is worth more than the correlation:
+  a raw VUS on a +/-10% price test lives in [0.167, ~0.25], so quoting it without the
+  ceiling is meaningless, and quoting it as evidence about the elasticity LEVEL is
+  provably meaningless.
+
+================================================================================================
+THE TEST WAS MIS-SPECIFIED.  `elasticity_sd` IS NOT LEARNABLE HETEROGENEITY.
+================================================================================================
+
+`elasticity_sd` adds an independent random draw per product.  The controls contain only
+coarse product summaries (`prod_log_price_mean`, `prod_n_weeks`, ...) and do not identify
+the product, so that draw is **invisible to any classifier**.  Raising it raises
+`oracle_corr`'s denominator without giving VUS anything to find -- which is why `vus_span`
+stayed at 0.007 even at +/-50% arms where the ceiling had risen to 0.55.
+
+VUS measures the heterogeneity a model can *recover*.  The corrected sweep therefore varies
+`elasticity_price_slope`, which makes the elasticity a deterministic function of an observed
+control, and is learnable in principle.
+
+  +/-10% (the motivating test) slope=+0.0 leaves=  8  true_sd=0.000 vus=0.1767 norm=+0.122 corr=+nan
+  +/-10% (the motivating test) slope=+0.0 leaves= 31  true_sd=0.000 vus=0.1764 norm=+0.151 corr=+nan
+  +/-10% (the motivating test) slope=+0.0 leaves=127  true_sd=0.000 vus=0.1765 norm=+0.138 corr=+nan
+  +/-10% (the motivating test) slope=-0.3 leaves=  8  true_sd=0.293 vus=0.1785 norm=+0.139 corr=+0.387
+  +/-10% (the motivating test) slope=-0.3 leaves= 31  true_sd=0.293 vus=0.1758 norm=+0.126 corr=+0.177
+  +/-10% (the motivating test) slope=-0.3 leaves=127  true_sd=0.293 vus=0.1786 norm=+0.199 corr=+0.089
+  +/-10% (the motivating test) slope=-0.6 leaves=  8  true_sd=0.585 vus=0.1763 norm=+0.114 corr=+0.607
+  +/-10% (the motivating test) slope=-0.6 leaves= 31  true_sd=0.585 vus=0.1732 norm=+0.086 corr=+0.369
+  +/-10% (the motivating test) slope=-0.6 leaves=127  true_sd=0.585 vus=0.1749 norm=+0.162 corr=+0.143
+  +/-10% (the motivating test) slope=-1.2 leaves=  8  true_sd=1.073 vus=0.1775 norm=+0.124 corr=+0.781
+  +/-10% (the motivating test) slope=-1.2 leaves= 31  true_sd=1.073 vus=0.1730 norm=+0.078 corr=+0.532
+  +/-10% (the motivating test) slope=-1.2 leaves=127  true_sd=1.073 vus=0.1722 norm=+0.092 corr=+0.206
+  +/-50%                       slope=+0.0 leaves=  8  true_sd=0.000 vus=0.1698 norm=+0.008 corr=+nan
+  +/-50%                       slope=+0.0 leaves= 31  true_sd=0.000 vus=0.1739 norm=+0.019 corr=+nan
+  +/-50%                       slope=+0.0 leaves=127  true_sd=0.000 vus=0.1731 norm=+0.021 corr=+nan
+  +/-50%                       slope=-0.3 leaves=  8  true_sd=0.293 vus=0.1748 norm=+0.020 corr=+0.826
+  +/-50%                       slope=-0.3 leaves= 31  true_sd=0.293 vus=0.1762 norm=+0.024 corr=+0.625
+  +/-50%                       slope=-0.3 leaves=127  true_sd=0.293 vus=0.1772 norm=+0.034 corr=+0.316
+  +/-50%                       slope=-0.6 leaves=  8  true_sd=0.585 vus=0.1718 norm=+0.012 corr=+0.952
+  +/-50%                       slope=-0.6 leaves= 31  true_sd=0.585 vus=0.1755 norm=+0.022 corr=+0.834
+  +/-50%                       slope=-0.6 leaves=127  true_sd=0.585 vus=0.1777 norm=+0.034 corr=+0.613
+  +/-50%                       slope=-1.2 leaves=  8  true_sd=1.073 vus=0.1720 norm=+0.012 corr=+0.986
+  +/-50%                       slope=-1.2 leaves= 31  true_sd=1.073 vus=0.1745 norm=+0.018 corr=+0.940
+  +/-50%                       slope=-1.2 leaves=127  true_sd=1.073 vus=0.1717 norm=+0.015 corr=+0.792
+
+================================================================================================
+P3, WITH LEARNABLE HETEROGENEITY
+================================================================================================
+                        arms  n  vus_span  rho(vus_norm, oracle_corr)  rho(vus_norm, |bias|)
++/-10% (the motivating test)  9   +0.0064                     -0.5667                +0.1500
+                      +/-50%  9   +0.0060                     -0.8667                +0.6167
+
+Also: does the VUS itself rise with the amount of learnable heterogeneity?
+                                          true_sd     vus  vus_norm  oracle_corr
+arms                         price_slope                                        
++/-10% (the motivating test) -1.2         +1.0732 +0.1742   +0.0980      +0.5062
+                             -0.6         +0.5853 +0.1748   +0.1206      +0.3731
+                             -0.3         +0.2934 +0.1776   +0.1544      +0.2175
+                              0.0         +0.0000 +0.1765   +0.1368          NaN
++/-50%                       -1.2         +1.0732 +0.1728   +0.0150      +0.9059
+                             -0.6         +0.5853 +0.1750   +0.0226      +0.7997
+                             -0.3         +0.2934 +0.1761   +0.0262      +0.5893
+                              0.0         +0.0000 +0.1723   +0.0159          NaN
