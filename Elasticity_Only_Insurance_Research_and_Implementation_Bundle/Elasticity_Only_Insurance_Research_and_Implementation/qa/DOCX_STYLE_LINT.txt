@@ -1,0 +1,14 @@
+[style_lint] direct run-formatting runs: 276
+[style_lint] direct paragraph-formatting paragraphs: 214
+[style_lint] top fonts by char count: Carlito(3990)
+[style_lint] heading-like paragraphs not using Heading styles (first 10):
+  - #933: style='Compact' text='Family'
+  - #934: style='Compact' text='Trials per contrast/model'
+  - #951: style='Compact' text='Parameter'
+  - #952: style='Compact' text='Range'
+  - #953: style='Compact' text='Notes'
+  - #990: style='Compact' text='Parameter'
+  - #991: style='Compact' text='Range'
+  - #992: style='Compact' text='Notes'
+  - #1029: style='Compact' text='Parameter'
+  - #1030: style='Compact' text='Range'

@@ -1,0 +1,127 @@
+project:
+  name: motor_insurance_elasticity
+  seed: 2026
+  output_dir: ./outputs
+  optuna_storage: sqlite:///outputs/optuna_elasticity.db
+
+data:
+  path: /absolute/path/to/real_randomized_quotes.parquet
+  format: parquet            # parquet or csv
+  timezone: Europe/Warsaw
+  outcome_window_days: 30
+  unit_of_analysis: quote
+
+columns:
+  quote_id: quote_id
+  customer_id: customer_id
+  timestamp: quote_timestamp
+  eligible: eligible
+  arm: arm
+  purchase: purchase
+  pi_high: pi_H
+  pi_control: pi_C
+  pi_low: pi_L
+  randomization_block: randomization_block
+  assigned_multiplier: assigned_multiplier
+  base_premium: base_premium
+  displayed_premium: displayed_premium
+  tariff_version: tariff_version
+  contribution_high: contribution_H
+  contribution_control: contribution_C
+  contribution_low: contribution_L
+
+features:
+  numeric:
+    - base_premium
+    - expected_claim_cost
+    - tariff_uncertainty
+    - competitor_gap
+    - driver_age
+    - vehicle_age
+  categorical:
+    - channel
+    - tariff_version
+    - vehicle_make_group
+    - region
+    - new_business_or_renewal
+  one_hot_min_frequency: 20
+  native_categorical_for_lightgbm: true
+  native_categorical_for_xgboost: false
+
+price_grid:
+  arm_order: [H, C, L]
+  multipliers: [1.10, 1.00, 0.90]
+  use_realized_row_level_log_dose: false
+
+splitting:
+  final_time_holdout_fraction: 0.20
+  outer_group_folds: 5
+  inner_group_folds: 4
+  calibration_group_folds: 4
+  rolling_time_backtests: 3
+  cluster_column: customer_id
+  minimum_pair_buyers_per_validation_fold: 100
+
+weights:
+  decision_unit: quote           # quote or customer
+  cap_customer_quote_weight: null
+  do_not_balance_buyer_classes: true
+
+models:
+  global_scalar: true
+  pairwise_logistic: true
+  pairwise_random_forest: true
+  pairwise_lightgbm: true
+  pairwise_xgboost: true
+  scalar_random_forest_moment: true
+  scalar_lightgbm_custom: true
+  scalar_xgboost_custom: true
+  multiclass_benchmarks: true
+  convex_stack: true
+  monotonicity_projection: hard
+
+optuna:
+  sampler: multivariate_tpe
+  n_startup_trials: 30
+  pruner: median
+  n_warmup_folds: 1
+  studies:
+    logistic_trials_per_contrast: 60
+    random_forest_trials_per_contrast: 120
+    lightgbm_trials_per_contrast: 200
+    xgboost_trials_per_contrast: 200
+    scalar_lightgbm_trials: 150
+    scalar_xgboost_trials: 150
+  timeout_seconds: null
+  n_jobs: 1
+
+calibration:
+  method: propensity_offset_affine
+  slope_nonnegative: true
+  enforce_high_log_rr_nonpositive: true
+  enforce_low_log_rr_nonnegative: true
+  use_isotonic_only_if_pair_calibration_n_at_least: 2000
+
+selection:
+  primary_metric: equal_contrast_nll
+  require_positive_information_gain_ci: true
+  information_gain_ci_level: 0.95
+  maximum_allowed_projection_rate: 0.10
+  require_forward_time_confirmation: true
+  business_tie_breaker: lower_confidence_bound_ips_contribution_lift
+
+policy:
+  baseline_policy: control
+  compare_uniform_arms: true
+  selective_adjustment_fractions: [0.05, 0.10, 0.20, 0.40, 0.60, 1.00]
+  cluster_bootstrap_repetitions: 2000
+  confidence_level: 0.95
+  minimum_relative_contribution_gain: 0.00
+
+reporting:
+  save_oof_predictions: true
+  save_optuna_studies: true
+  save_models: true
+  save_feature_importance: true
+  permutation_importance_repeats: 30
+  retain_dead_ends: true
